@@ -1,0 +1,28 @@
+[module]
+name        = "ds3231"
+version     = "1.0.0"
+description = "DS3231 real-time clock"
+author      = "zapp-lang"
+
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "i2c"
+
+[i2c]
+addr_default = 0x68
+
+# No init required — DS3231 runs from battery backup
+
+[fields.time]
+type      = "text"
+reg       = 0x00
+len       = 3
+transform = "ds3231_time"
+
+[fields.date]
+type      = "text"
+reg       = 0x04
+len       = 3
+transform = "ds3231_date"

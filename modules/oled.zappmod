@@ -1,0 +1,20 @@
+[module]
+name        = "oled"
+version     = "1.0.0"
+description = "Any I2C OLED: SSD1306 (0.96in 128x64, 0.91in 128x32) or SH1106 (1.3in), detected at startup"
+author      = "zapp-lang"
+
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "display"
+
+# The board probes 0x3C then 0x3D and reads the controller's status byte to
+# tell SSD1306 from SH1106 and 128x64 from 128x32.
+[display]
+controller  = "auto"
+width       = 128
+height      = 64
+addr        = 0x3C
+addr_alt    = 0x3D

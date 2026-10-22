@@ -1,0 +1,11 @@
+// GATT database for the Zapp BLE peripheral.
+// compile_gatt.py turns this into zapp_ble.h at build time.
+
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "Zapp"
+
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+
+// Nordic UART service: notify to the phone, write from the phone.
+#import <nordic_spp_service.gatt>

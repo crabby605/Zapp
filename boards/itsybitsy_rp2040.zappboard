@@ -1,0 +1,40 @@
+# Pin map from CircuitPython's adafruit_itsybitsy_rp2040 board definition.
+# D5 is the 5V-level output.
+[board]
+name    = "itsybitsy_rp2040"
+chip    = "rp2040"
+title   = "Adafruit ItsyBitsy RP2040"
+install = "Hold the BOOT button and tap RESET"
+[pins]
+LED            = 11
+NEOPIXEL       = 17
+BUTTON         = 13
+A0             = 26
+A1             = 27
+A2             = 28
+A3             = 29
+D0             = 1
+D1             = 0
+D2             = 12
+D3             = 5
+D4             = 4
+D5             = 14
+D7             = 6
+D9             = 7
+D10            = 8
+D11            = 9
+D12            = 10
+D13            = 11
+D24            = 24
+D25            = 25
+SDA            = 2
+SCL            = 3
+TX             = 0
+RX             = 1
+SCK            = 18
+MOSI           = 19
+MISO           = 20
+[indicators]
+LED            = "led"
+NEOPIXEL       = "neopixel power=16"
+BUTTON         = "button active_low"

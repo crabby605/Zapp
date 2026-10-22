@@ -1,0 +1,55 @@
+[module]
+name        = "mpu6050"
+version     = "1.0.0"
+description = "MPU6050 6-axis accelerometer and gyroscope"
+author      = "zapp-lang"
+
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "i2c"
+
+[i2c]
+addr_default = 0x68
+addr_alt     = 0x69
+
+# Wake from sleep mode
+[init]
+0x6B = 0x00
+
+[fields.accel_x]
+type      = "num"
+reg       = 0x3B
+len       = 2
+transform = "mpu6050_accel"
+
+[fields.accel_y]
+type      = "num"
+reg       = 0x3D
+len       = 2
+transform = "mpu6050_accel"
+
+[fields.accel_z]
+type      = "num"
+reg       = 0x3F
+len       = 2
+transform = "mpu6050_accel"
+
+[fields.gyro_x]
+type      = "num"
+reg       = 0x43
+len       = 2
+transform = "mpu6050_gyro"
+
+[fields.gyro_y]
+type      = "num"
+reg       = 0x45
+len       = 2
+transform = "mpu6050_gyro"
+
+[fields.gyro_z]
+type      = "num"
+reg       = 0x47
+len       = 2
+transform = "mpu6050_gyro"

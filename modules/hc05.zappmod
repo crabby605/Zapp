@@ -1,0 +1,18 @@
+[module]
+name        = "hc05"
+version     = "1.0.0"
+description = "HC-05 Bluetooth Module"
+author      = "zapp-lang"
+[compat]
+min_flash_kb = 8
+min_ram_kb   = 4
+targets      = ["all"]
+interface    = "uart"
+[uart]
+baud         = 9600
+bits         = 8
+parity       = "none"
+stop_bits    = 1
+line_end     = "\r\n"
+[protocol]
+type         = "stream"

@@ -1,0 +1,17 @@
+{
+  "name": "zapp-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server that lets Claude drive a Zapp board over USB serial",
+  "bin": { "zapp-mcp": "./server.ts" },
+  "scripts": {
+    "start": "tsx server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "serialport": "^13.0.0",
+    "tsx": "^4.21.0",
+    "zod": "^3.25.0"
+  }
+}

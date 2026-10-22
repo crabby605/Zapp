@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "zapp": {
+      "command": "npx",
+      "args": ["tsx", "mcp/server.ts"],
+      "env": {}
+    }
+  }
+}

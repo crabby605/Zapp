@@ -1,0 +1,18 @@
+[module]
+name        = "sh1106"
+version     = "1.0.0"
+description = "SH1106 1.3 inch 128x64 I2C OLED display"
+author      = "zapp-lang"
+
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "display"
+
+[display]
+controller  = "sh1106"
+width       = 128
+height      = 64
+addr        = 0x3C
+addr_alt    = 0x3D

@@ -1,0 +1,9 @@
+node_modules/
+build/
+build-*/
+cmake-build-*/
+.next/
+*.tsbuildinfo
+emulator/zapp-emu
+.DS_Store
+.idea/

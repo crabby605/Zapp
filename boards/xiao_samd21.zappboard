@@ -1,0 +1,29 @@
+[board]
+name    = "xiao_samd21"
+chip    = "samd21"
+[pins]
+LED      = 13
+A0       = 2
+A1       = 4
+A2       = 10
+A3       = 11
+A4       = 8
+A5       = 9
+D0       = 2
+D1       = 4
+D2       = 10
+D3       = 11
+D4       = 8
+D5       = 9
+D6       = 8
+D7       = 9
+D8       = 6
+D9       = 5
+D10      = 7
+SDA      = 8
+SCL      = 9
+MOSI     = 6
+MISO     = 5
+SCK      = 7
+TX       = 6
+RX       = 7

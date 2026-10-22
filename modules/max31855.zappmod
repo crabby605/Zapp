@@ -1,0 +1,38 @@
+[module]
+name        = "max31855"
+version     = "1.0.0"
+description = "MAX31855 thermocouple amplifier"
+author      = "zapp-lang"
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "spi"
+[spi]
+mode         = 0
+freq_khz     = 5000
+cs_active    = "low"
+bit_order    = "msb"
+transaction  = "read_only"
+[fields.temp]
+type         = "num"
+tx           = []
+rx_len       = 4
+bit_mask     = 0xFFFC0000
+bit_shift    = 18
+transform    = "twos_complement_14"
+scale        = 0.25
+[fields.fault]
+type         = "bool"
+tx           = []
+rx_len       = 4
+bit_mask     = 0x00000001
+bit_shift    = 0
+transform    = "raw_u8"
+[fields.fault_code]
+type         = "num"
+tx           = []
+rx_len       = 4
+bit_mask     = 0x00000007
+bit_shift    = 0
+transform    = "raw_u8"

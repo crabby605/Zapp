@@ -1,0 +1,38 @@
+# Pin map from CircuitPython's adafruit_kb2040 board definition.
+# SDA/SCL are the STEMMA QT port.
+[board]
+name    = "kb2040"
+chip    = "rp2040"
+title   = "Adafruit KB2040"
+install = "Hold the BOOT button and tap RESET"
+[pins]
+NEOPIXEL       = 17
+BUTTON         = 11
+A0             = 26
+A1             = 27
+A2             = 28
+A3             = 29
+D0             = 0
+D1             = 1
+D2             = 2
+D3             = 3
+D4             = 4
+D5             = 5
+D6             = 6
+D7             = 7
+D8             = 8
+D9             = 9
+D10            = 10
+D11            = 11
+D12            = 12
+D13            = 13
+SDA            = 12
+SCL            = 13
+TX             = 0
+RX             = 1
+SCK            = 18
+MOSI           = 19
+MISO           = 20
+[indicators]
+NEOPIXEL       = "neopixel"
+BUTTON         = "button active_low"

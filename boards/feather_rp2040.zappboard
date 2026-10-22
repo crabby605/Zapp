@@ -1,0 +1,38 @@
+# Pin map from CircuitPython's adafruit_feather_rp2040 board definition.
+# BUTTON is the BOOT button.
+[board]
+name    = "feather_rp2040"
+chip    = "rp2040"
+title   = "Adafruit Feather RP2040"
+install = "Hold the BOOT button and tap RESET"
+[pins]
+LED            = 13
+NEOPIXEL       = 16
+BUTTON         = 4
+A0             = 26
+A1             = 27
+A2             = 28
+A3             = 29
+D0             = 1
+D1             = 0
+D4             = 6
+D5             = 7
+D6             = 8
+D9             = 9
+D10            = 10
+D11            = 11
+D12            = 12
+D13            = 13
+D24            = 24
+D25            = 25
+SDA            = 2
+SCL            = 3
+TX             = 0
+RX             = 1
+SCK            = 18
+MOSI           = 19
+MISO           = 20
+[indicators]
+LED            = "led"
+NEOPIXEL       = "neopixel"
+BUTTON         = "button active_low"

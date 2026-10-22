@@ -1,0 +1,40 @@
+# Pin map from CircuitPython's seeeduino_xiao_rp2040 board definition.
+[board]
+name    = "xiao_rp2040"
+chip    = "rp2040"
+title   = "Seeed XIAO RP2040"
+install = "Hold the B button and tap R"
+[pins]
+LED            = 25
+LED_RED        = 17
+LED_GREEN      = 16
+LED_BLUE       = 25
+NEOPIXEL       = 12
+A0             = 26
+A1             = 27
+A2             = 28
+A3             = 29
+D0             = 26
+D1             = 27
+D2             = 28
+D3             = 29
+D4             = 6
+D5             = 7
+D6             = 0
+D7             = 1
+D8             = 2
+D9             = 4
+D10            = 3
+SDA            = 6
+SCL            = 7
+TX             = 0
+RX             = 1
+SCK            = 2
+MOSI           = 3
+MISO           = 4
+[indicators]
+LED            = "led active_low"
+LED_RED        = "led active_low"
+LED_GREEN      = "led active_low"
+LED_BLUE       = "led active_low"
+NEOPIXEL       = "neopixel power=11"

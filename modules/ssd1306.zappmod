@@ -1,0 +1,18 @@
+[module]
+name        = "ssd1306"
+version     = "1.0.0"
+description = "SSD1306 128x64 0.96 inch I2C OLED display"
+author      = "zapp-lang"
+
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "display"
+
+[display]
+controller  = "ssd1306"
+width       = 128
+height      = 64
+addr        = 0x3C
+addr_alt    = 0x3D

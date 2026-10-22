@@ -1,0 +1,42 @@
+[module]
+name        = "gps_nmea"
+version     = "1.0.0"
+description = "Generic NMEA 0183 GPS module"
+[compat]
+min_flash_kb = 6
+min_ram_kb   = 4
+targets      = ["all"]
+interface    = "uart"
+[uart]
+baud         = 9600
+bits         = 8
+parity       = "none"
+stop_bits    = 1
+line_end     = "\r\n"
+[protocol]
+type         = "stream"
+[fields.latitude]
+type         = "num"
+read         = "line"
+filter       = "$GPGGA"
+parse        = "nmea_gga_lat"
+[fields.longitude]
+type         = "num"
+read         = "line"
+filter       = "$GPGGA"
+parse        = "nmea_gga_lon"
+[fields.altitude]
+type         = "num"
+read         = "line"
+filter       = "$GPGGA"
+parse        = "nmea_gga_alt"
+[fields.fix]
+type         = "bool"
+read         = "line"
+filter       = "$GPGGA"
+parse        = "nmea_gga_fix"
+[fields.speed]
+type         = "num"
+read         = "line"
+filter       = "$GPRMC"
+parse        = "nmea_rmc_speed"

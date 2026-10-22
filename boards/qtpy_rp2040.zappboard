@@ -1,0 +1,37 @@
+# Pin map from CircuitPython's adafruit_qtpy_rp2040 board definition.
+# No plain LED; the NeoPixel is the indicator. SDA1/SCL1 are the STEMMA QT port.
+[board]
+name    = "qtpy_rp2040"
+chip    = "rp2040"
+title   = "Adafruit QT Py RP2040"
+install = "Hold the BOOT button and tap RESET"
+[pins]
+NEOPIXEL       = 12
+BUTTON         = 21
+A0             = 29
+A1             = 28
+A2             = 27
+A3             = 26
+D0             = 29
+D1             = 28
+D2             = 27
+D3             = 26
+D4             = 24
+D5             = 25
+D6             = 20
+D7             = 5
+D8             = 6
+D9             = 4
+D10            = 3
+SDA1           = 22
+SCL1           = 23
+SDA            = 24
+SCL            = 25
+TX             = 20
+RX             = 5
+SCK            = 6
+MOSI           = 3
+MISO           = 4
+[indicators]
+NEOPIXEL       = "neopixel power=11"
+BUTTON         = "button active_low"
