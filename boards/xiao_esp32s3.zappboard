@@ -4,7 +4,7 @@
 name    = "xiao_esp32s3"
 chip    = "esp32s3"
 title   = "Seeed XIAO ESP32S3"
-install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see docs/building.md)"
 radio   = "wifi ble"
 [pins]
 LED            = 21

@@ -1,0 +1,14 @@
+node_modules
+.next
+workspace
+firmware/rp2040/pico-sdk
+# Build folders stay home, except the firmware the Install dialog hands out.
+firmware/rp2040/build*/*
+!firmware/rp2040/build*/zapp.uf2
+firmware/esp32s3/build*
+firmware/esp32s3/managed_components
+emulator/zapp-emu
+cmake-build-*
+.idea
+.env*
+.vercel

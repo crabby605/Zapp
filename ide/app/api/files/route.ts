@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { STARTER } from '../../../lib/templates';
+import { HOSTED } from '../../../lib/workspace';
 import { findZappDrive } from '../../../../compiler/src/nodeInstall';
 
 // Workspace file API
@@ -50,20 +52,6 @@ function driveLimits(base: string): DriveLimits {
     } catch { /* fall through */ }
     return { share: null, perFile: 2048, files: 8, nameMax: 23 };   // older firmware
 }
-
-const STARTER = `# Welcome to Zapp.
-# Run this with the Run button or Cmd/Ctrl+Enter — no board required.
-
-num count = 0
-
-repeat 3:
-    count = count + 1
-    print "blink " + count
-    set pin 25 high
-    sleep 200ms
-    set pin 25 low
-    sleep 200ms
-`;
 
 export interface TreeNode {
     path: string;            // "workspace/web/index.html"
@@ -207,14 +195,16 @@ function writeNew(dir: Resolved, name: string, content: string, overwrite = fals
     return { path: toRelative(dir.root, abs) };
 }
 
+// Hosted, this server only serves the read-only examples and library: each
+// visitor's own files stay in their browser (lib/workspace.ts).
 export async function GET(request: Request) {
-    ensureWorkspace();
+    if (!HOSTED) ensureWorkspace();
     const target = new URL(request.url).searchParams.get('path');
 
     if (!target) {
-        const drive = findZappDrive();
+        const drive = HOSTED ? null : findZappDrive();
         return NextResponse.json({
-            workspace: walk('workspace', FIXED.workspace.dir),
+            workspace: HOSTED ? [] : walk('workspace', FIXED.workspace.dir),
             examples: walk('examples', FIXED.examples.dir).filter((n) => n.kind === 'file' && n.name.endsWith('.zap')),
             drive: drive ? (() => {
                 const limits = driveLimits(drive);
@@ -234,6 +224,7 @@ export async function GET(request: Request) {
 
     const resolved = resolve(target);
     if (!resolved || !allowedFile(resolved.abs)) return bad('Bad path');
+    if (HOSTED && resolved.root !== 'examples' && resolved.root !== 'library') return bad('Not found', 404);
     if (!fs.existsSync(resolved.abs) || !fs.statSync(resolved.abs).isFile()) return bad('Not found', 404);
     return NextResponse.json({
         path: target,
@@ -243,6 +234,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+    if (HOSTED) return bad('Files are kept in your browser here', 403);
     ensureWorkspace();
     const { path: target, content } = await request.json();
     const resolved = resolve(String(target ?? ''));
@@ -260,6 +252,7 @@ export async function PUT(request: Request) {
 
 // ops: create (file or folder, in a folder), rename, move, copy, delete.
 export async function POST(request: Request) {
+    if (HOSTED) return bad('Files are kept in your browser here', 403);
     ensureWorkspace();
     const body = await request.json();
     const op = String(body.op ?? '');

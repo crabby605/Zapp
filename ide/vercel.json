@@ -1,0 +1,3 @@
+{
+  "buildCommand": "make -C ../emulator && next build"
+}

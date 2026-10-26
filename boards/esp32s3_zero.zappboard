@@ -4,7 +4,7 @@
 name    = "esp32s3_zero"
 chip    = "esp32s3"
 title   = "Waveshare ESP32-S3-Zero"
-install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see docs/building.md)"
 radio   = "wifi ble"
 [pins]
 NEOPIXEL       = 21

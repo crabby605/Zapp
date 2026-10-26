@@ -164,7 +164,7 @@ export function Workbench() {
             return out;
         };
         try {
-            const data = await fetch('/api/modules').then((r) => r.json());
+            const data = await ws.listModules();
             setLibrary(parse(data.library));
             setInstalled(parse(data.installed));
         } catch { /* offline: keep what we have */ }
@@ -207,8 +207,9 @@ export function Workbench() {
 
     useEffect(() => { ws.saveSession({ open, active: panes.left }); }, [open, panes.left]);
     // Boards are plugged in and out: look for the drive while My programs is showing.
+    // Hosted, the server never sees a drive, so there's nothing to look for.
     useEffect(() => {
-        if (tool !== 'programs') return;
+        if (tool !== 'programs' || ws.HOSTED) return;
         const id = setInterval(() => void refreshTree(), 3000);
         return () => clearInterval(id);
     }, [tool, refreshTree]);
@@ -354,16 +355,20 @@ export function Workbench() {
 
     const copyExample = async (from = buffer?.path) => {
         if (!from) return;
-        const { path } = await ws.copyToWorkspace(from);
-        await refreshTree();
-        if (!path) return;
-        // Carry over any edits made to the example before copying.
-        const content = buffers[from]?.content ?? (await ws.readFile(path)).content;
-        await ws.writeFile(path, content);
-        setBuffers((prev) => ({ ...prev, [path]: { path, content, saved: content, writable: true } }));
-        setOpen((prev) => [...prev.filter((p) => p !== from), path]);
-        setActive(path);
-        notify(`Copied to My programs as ${ws.fileName(path)}`);
+        try {
+            const { path } = await ws.copyToWorkspace(from);
+            await refreshTree();
+            if (!path) return;
+            // Carry over any edits made to the example before copying.
+            const content = buffers[from]?.content ?? (await ws.readFile(path)).content;
+            await ws.writeFile(path, content);
+            setBuffers((prev) => ({ ...prev, [path]: { path, content, saved: content, writable: true } }));
+            setOpen((prev) => [...prev.filter((p) => p !== from), path]);
+            setActive(path);
+            notify(`Copied to My programs as ${ws.fileName(path)}`);
+        } catch (e) {
+            notify(e instanceof Error ? e.message : "Couldn't copy that");
+        }
     };
 
     const closeTab = async (path: string) => {
@@ -454,9 +459,7 @@ export function Workbench() {
     const installModule = async (name: string) => {
         setModuleBusy(name);
         try {
-            const res = await fetch('/api/modules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'install', name }) });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
+            await ws.installModule(name);
             await loadModules();
             notify(addUse(name) ? `Installed ${name} and added “use ${name}” to your program` : `Installed ${name}`);
         } catch (e) {
@@ -473,9 +476,11 @@ export function Workbench() {
         }))) return;
         setModuleBusy(name);
         try {
-            await fetch('/api/modules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'remove', name }) });
+            await ws.removeModule(name);
             await loadModules();
             notify(`Removed ${name}`);
+        } catch (e) {
+            notify(e instanceof Error ? e.message : 'Remove failed');
         } finally {
             setModuleBusy(null);
         }
@@ -494,11 +499,9 @@ export function Workbench() {
         const name = raw.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
         if (!name) return notify('Use letters, numbers or _ in the name');
         try {
-            const res = await fetch('/api/modules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'create', name }) });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
+            const path = await ws.createModule(name);
             await loadModules();
-            void openPath(data.path);
+            void openPath(path);
         } catch (e) {
             notify(e instanceof Error ? e.message : "Couldn't create the module");
         }
@@ -643,7 +646,7 @@ export function Workbench() {
         } finally {
             setBusy(false);
         }
-    }, [build.error, board, pressed, compile, simScreen, log]);
+    }, [active, build.error, board, pressed, compile, simScreen, log]);
 
     // On a connected board, Run runs there — without replacing the saved program.
     const run = useCallback(async () => {

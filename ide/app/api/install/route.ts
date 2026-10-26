@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { HOSTED } from '../../../lib/workspace';
 import { copyUf2, firmwarePath, waitForUf2Drive, type FirmwareVariant } from '../../../../compiler/src/nodeInstall';
 
 // Install Zapp on a board in bootloader mode: wait for its RPI-RP2 drive to
 // mount on this machine, then copy the firmware on. The IDE server runs on the
 // same computer the board is plugged into, so it can do what you'd do by hand.
 export async function POST(request: Request) {
+  if (HOSTED) return NextResponse.json({ error: 'Installing runs from the desktop IDE (clone the repo, then npm run dev in ide/)' }, { status: 400 });
   const { variant = 'core', waitMs = 60_000 } = await request.json().catch(() => ({}));
   const v: FirmwareVariant = variant === 'pico_w' ? 'pico_w' : 'core';
   const uf2 = firmwarePath(path.join(process.cwd(), '..'), v);

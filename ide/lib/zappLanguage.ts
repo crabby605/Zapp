@@ -125,11 +125,24 @@ export function registerZappLanguage(monaco: Monaco) {
         }],
     });
 
+    // Whether the text before the cursor ends inside a # comment or a "string" —
+    // places where keywords and pin names are just noise.
+    const inProse = (before: string) => {
+        let quoted = false;
+        for (let i = 0; i < before.length; i++) {
+            const c = before[i];
+            if (quoted && c === '\\') i++;
+            else if (c === '"') quoted = !quoted;
+            else if (c === '#' && !quoted) return true;
+        }
+        return quoted;
+    };
+
     // Hover
     monaco.languages.registerHoverProvider('zapp', {
         provideHover: (model: monacoApi.editor.ITextModel, position: monacoApi.Position) => {
             const word = model.getWordAtPosition(position);
-            if (!word) return null;
+            if (!word || inProse(model.getLineContent(position.lineNumber).slice(0, word.startColumn - 1))) return null;
 
             // module.field → what the .zappmod says about that reading
             const line = model.getLineContent(position.lineNumber);
@@ -169,6 +182,7 @@ export function registerZappLanguage(monaco: Monaco) {
             const Kind = monaco.languages.CompletionItemKind;
             const Snippet = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
             const before = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+            if (inProse(before)) return { suggestions: [] };
             // The statement typed so far, minus the word being completed.
             const stmt = before.trimStart().slice(0, before.trimStart().length - word.word.length);
             const ctx = scan(model.getValue());

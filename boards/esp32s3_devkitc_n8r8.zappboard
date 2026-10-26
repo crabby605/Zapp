@@ -6,7 +6,7 @@
 name    = "esp32s3_devkitc_n8r8"
 chip    = "esp32s3"
 title   = "Espressif ESP32-S3-DevKitC-1 N8R8"
-install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see docs/building.md)"
 radio   = "wifi ble"
 [pins]
 NEOPIXEL       = 48

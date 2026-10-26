@@ -442,7 +442,17 @@ bool hal_ble_message(char *out, size_t out_len) {
     return true;
 }
 
-void hal_radio_poll(void) {}
+// The VM calls this before every instruction, so it's also where a loop that
+// never sleeps or prints gets stopped.
+#define STEP_LIMIT 100000000ull
+void hal_radio_poll(void) {
+    static uint64_t steps = 0;
+    if (++steps == STEP_LIMIT) {
+        printf("Stopped: the program ran %llu million steps without sleeping. Add a sleep inside repeat forever.\n",
+               STEP_LIMIT / 1000000);
+        vm_request_halt();
+    }
+}
 
 // Debug output
 void hal_debug_print(const char *s) { fputs(s, stdout); }

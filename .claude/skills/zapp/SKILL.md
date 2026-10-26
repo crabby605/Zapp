@@ -211,7 +211,7 @@ Write `modules/<name>.zappmod` — `[module]`, `[compat] interface = i2c|uart|sp
 the bus section, optional `[init]` register writes, and one `[fields.x]` block
 per reading. For I2C, describe each reading with `reg`, `format` (`u8`, `i16_be`,
 `u24_le`…) and optional `shift`, `bits`, `mask`, `scale`, `offset`, `type = "bool"`
-— see the README's module section. Only maths those can't express needs a new
+— see docs/modules.md. Only maths those can't express needs a new
 transform: add it to the `TransformId` enum in `firmware/core/vm.c` **and** to
 `TRANSFORM_IDS` in `compiler/src/opcodes.ts` — `tests/opcodes.test.ts` fails if
 the two drift.

@@ -3,7 +3,7 @@
 name    = "lolin_s3_mini"
 chip    = "esp32s3"
 title   = "LOLIN S3 Mini"
-install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see docs/building.md)"
 radio   = "wifi ble"
 [pins]
 NEOPIXEL       = 47

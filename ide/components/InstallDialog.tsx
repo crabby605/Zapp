@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { BoardDefinition } from '../../compiler/src/index';
 import { firmwareUrl, firmwareVariant, installViaServer } from '../lib/install';
+import { HOSTED } from '../lib/workspace';
 import { IconCheck, IconClose, IconDownload } from './icons';
 
 type Step = 'ready' | 'waiting' | 'done' | 'error';
@@ -20,6 +21,10 @@ export function InstallDialog({ boards, board, onBoard, canAutoBoot, onAutoBoot,
     const [error, setError] = useState('');
     const variant = firmwareVariant(board?.name ?? 'pico');
     const howTo = board?.install ?? 'Hold the BOOT button while you plug the board in';
+    // Only RP2040 boards take a .uf2; ESP32-S3 boards flash with idf.py. Hosted,
+    // the server can't see the board, so you drag the file on yourself.
+    const chip = board?.chip ?? 'rp2040';
+    const canAuto = chip === 'rp2040' && !HOSTED;
 
     const install = async () => {
         setStep('waiting');
@@ -67,7 +72,12 @@ export function InstallDialog({ boards, board, onBoard, canAutoBoot, onAutoBoot,
                                     {!canAutoBoot && <p>{howTo}. A drive called <code>RPI-RP2</code> appears and Zapp installs by itself.</p>}
                                 </div>
                             </div>
-                        ) : (
+                        ) : chip === 'esp32s3' ? (
+                            <p className="lead">ESP32-S3 boards install from the command line: <b>{howTo}</b>. The
+                                steps are in <a className="link" href="https://github.com/crabby605/Zapp/blob/main/docs/building.md" target="_blank" rel="noreferrer">docs/building.md</a>.</p>
+                        ) : chip !== 'rp2040' ? (
+                            <p className="lead">Zapp doesn't have firmware for this board yet.</p>
+                        ) : canAuto ? (
                             <>
                                 <p className="lead">
                                     {canAutoBoot
@@ -76,12 +86,22 @@ export function InstallDialog({ boards, board, onBoard, canAutoBoot, onAutoBoot,
                                 </p>
                                 <button className="btn primary big" onClick={install}>Install Zapp</button>
                             </>
+                        ) : (
+                            <>
+                                <p className="lead">Download Zapp, then put the board in install mode: <b>{howTo}</b>.
+                                    A drive called <code>RPI-RP2</code> appears — drag <code>zapp.uf2</code> onto it.</p>
+                                <a className="btn primary big" href={firmwareUrl(variant)} download={`zapp-${variant}.uf2`}>
+                                    <IconDownload size={14} /> Download zapp.uf2
+                                </a>
+                            </>
                         )}
 
                         {error && <p className="error-text">{error}</p>}
-                        <a className="link" href={firmwareUrl(variant)} download>
-                            <IconDownload size={13} /> Or download zapp.uf2 and drag it onto RPI-RP2 yourself
-                        </a>
+                        {canAuto && step !== 'waiting' && (
+                            <a className="link" href={firmwareUrl(variant)} download>
+                                <IconDownload size={13} /> Or download zapp.uf2 and drag it onto RPI-RP2 yourself
+                            </a>
+                        )}
                         <p className="fineprint">
                             Installing replaces whatever firmware the board runs now (CircuitPython, MicroPython…)
                             and erases its drive — copy off anything you want to keep first.

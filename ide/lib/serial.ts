@@ -96,7 +96,8 @@ export class ZappSerial {
                     }
                 }
             } catch {
-                break;   // port closed or unplugged
+                // Overruns and framing errors leave a fresh `readable` to carry on
+                // with; unplugging leaves none, which ends the loop.
             } finally {
                 this.reader?.releaseLock();
                 this.reader = null;

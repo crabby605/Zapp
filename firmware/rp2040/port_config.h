@@ -1,7 +1,11 @@
 #pragma once
 
 #define ZAPP_CHIP           "rp2040"
+#ifdef ZAPP_HAS_RADIO
+#define ZAPP_VARIANT        "pico_w"
+#else
 #define ZAPP_VARIANT        "core"
+#endif
 
 // Clock frequency in MHz. Safe range: 48-280.
 #define ZAPP_CLOCK_MHZ      133

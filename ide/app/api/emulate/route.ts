@@ -10,7 +10,8 @@ const run = promisify(execFile);
 // on first use. Same VM as the firmware, so the trace matches the board.
 export async function POST(request: Request) {
   const { payload, gpio = [], noRadio = false, display = 'ssd1306' } = await request.json();
-  if (typeof payload !== 'string' || !payload.startsWith('BC:')) {
+  // A board holds at most a few KB of bytecode; this keeps the public site from running anything bigger.
+  if (typeof payload !== 'string' || !payload.startsWith('BC:') || payload.length > 128 * 1024) {
     return NextResponse.json({ error: 'Expected a BC: payload' }, { status: 400 });
   }
 
