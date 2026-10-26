@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { loader } from '@monaco-editor/react';
 import { DOCS, HELP_GROUPS } from '../lib/zappDocs';
 import { registerZappLanguage } from '../lib/zappLanguage';
 import { IconPlus } from './icons';
@@ -74,7 +73,7 @@ function ZappCode({ code, className, language = 'zapp' }: { code: string; classN
     const [html, setHtml] = useState<string | null>(null);
     useEffect(() => {
         let live = true;
-        loader.init().then(async (monaco) => {
+        import('../lib/monaco').then(({ loader }) => loader.init()).then(async (monaco) => {
             registerZappLanguage(monaco);
             monaco.editor.setTheme('zapp-dark');
             const out = await monaco.editor.colorize(code, language, { tabSize: 4 });

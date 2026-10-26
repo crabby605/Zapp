@@ -3,7 +3,15 @@
     "target": "ES6",
     "module": "CommonJS",
     "strict": true,
-    "types": ["jest", "node"]
+    "types": [
+      "jest",
+      "node"
+    ]
   },
-  "exclude": ["node_modules", "firmware", "ide"]
+  "exclude": [
+    "node_modules",
+    "firmware",
+    "ide",
+    "mcp"
+  ]
 }

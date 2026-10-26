@@ -19,7 +19,7 @@ import { GuideDoc } from './GuideDoc';
 import { Tour, tourSeen, type TourStep } from './Tour';
 import { FileIcon, IconBolt, IconBook, IconCheck, IconChevron, IconChip, IconClose, IconDownload, IconError, IconFiles, IconHelp, IconPackage, IconPlay, IconSearch, IconSim, IconSplit, IconStop, IconWarn } from './icons';
 
-const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const Editor = dynamic(() => import('../lib/monaco').then(() => import('@monaco-editor/react')), { ssr: false });
 
 type SimScreen = 'ssd1306' | 'ssd1306_32' | 'sh1106' | 'none';
 const SCREEN_LABELS: Record<SimScreen, string> = {

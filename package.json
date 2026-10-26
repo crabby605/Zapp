@@ -1,12 +1,14 @@
 {
   "name": "root",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p ide && tsc -p mcp"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.20",
+    "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
-    "jest": "^30.4.0",
-    "ts-jest": "^29.4.9",
-    "typescript": "^6.0.3"
+    "jest": "^30.5.2",
+    "typescript": "^7.0.2"
   }
 }

@@ -15,7 +15,8 @@ const store: Record<string, string> = {};
             : { workspace: [], examples: [], drive: null },
 });
 
-import * as ws from '../ide/lib/workspace';
+// After the stubs above: the module reads the flag when it loads, and imports would be hoisted.
+const ws: typeof import('../ide/lib/workspace') = require('../ide/lib/workspace');
 
 const names = async () => ws.allFiles((await ws.listFiles()).workspace).map((f) => f.path);
 
