@@ -11,6 +11,7 @@
 #include "hardware/uart.h"
 #include "ws2812.pio.h"
 #include <stdio.h>
+#include <string.h>
 
 #define I2C_TIMEOUT_US 100000  // 100ms per I2C operation
 
@@ -28,15 +29,21 @@ static bool zapp_spi_ready = false;
 static uart_inst_t *zapp_uart = uart0;
 static bool zapp_uart_ready = false;
 
+// Pins the running program has touched, so hal_reset() releases exactly those.
+static uint32_t pins_used;
+static void use_pin(uint pin) { if (pin < 30) pins_used |= 1u << pin; }
+
 void hal_board_init(void) {
 }
 
 void hal_gpio_set_output(uint8_t pin) {
+    use_pin(pin);
     gpio_init(pin);
     gpio_set_dir(pin, GPIO_OUT);
 }
 
 void hal_gpio_set_input(uint8_t pin) {
+    use_pin(pin);
     gpio_init(pin);
     gpio_set_dir(pin, GPIO_IN);
 }
@@ -51,6 +58,7 @@ bool hal_gpio_read(uint8_t pin) {
 
 void hal_pwm_set(uint8_t pin, uint8_t duty, uint32_t freq_hz) {
     if (freq_hz == 0) freq_hz = 1000;
+    use_pin(pin);
     gpio_set_function(pin, GPIO_FUNC_PWM);
     uint slice = pwm_gpio_to_slice_num(pin);
 
@@ -83,6 +91,7 @@ void hal_servo_set(uint8_t pin, int16_t angle) {
     uint32_t pulse_us = SERVO_MIN_US +
         ((uint32_t)(angle + 90) * (SERVO_MAX_US - SERVO_MIN_US)) / 180;
 
+    use_pin(pin);
     gpio_set_function(pin, GPIO_FUNC_PWM);
     uint slice = pwm_gpio_to_slice_num(pin);
     pwm_set_clkdiv(slice, (float)clock_get_hz(clk_sys) / 1000000.0f);  // 1 tick = 1us
@@ -94,6 +103,8 @@ void hal_servo_set(uint8_t pin, int16_t angle) {
 void hal_i2c_init(uint8_t sda, uint8_t scl, uint32_t freq_hz) {
     zapp_i2c = ((sda / 2) % 2 == 0) ? i2c0 : i2c1;
     i2c_init(zapp_i2c, freq_hz);
+    use_pin(sda);
+    use_pin(scl);
     gpio_set_function(sda, GPIO_FUNC_I2C);
     gpio_set_function(scl, GPIO_FUNC_I2C);
     gpio_pull_up(sda);
@@ -149,10 +160,14 @@ void hal_spi_init(uint8_t mosi, uint8_t miso, uint8_t sck, uint8_t cs,
                    (mode & 2) ? SPI_CPOL_1 : SPI_CPOL_0,
                    (mode & 1) ? SPI_CPHA_1 : SPI_CPHA_0,
                    SPI_MSB_FIRST);
+    use_pin(mosi);
+    use_pin(miso);
+    use_pin(sck);
     gpio_set_function(mosi, GPIO_FUNC_SPI);
     gpio_set_function(miso, GPIO_FUNC_SPI);
     gpio_set_function(sck,  GPIO_FUNC_SPI);
-    if (cs < 30) {              // 0xFF: no default chip select, programs name one per call
+    if (cs < 30) {
+        use_pin(cs);              // 0xFF: no default chip select, programs name one per call
         gpio_init(cs);
         gpio_set_dir(cs, GPIO_OUT);
         gpio_put(cs, 1);        // ponytail: chip-select is active-low only
@@ -160,10 +175,12 @@ void hal_spi_init(uint8_t mosi, uint8_t miso, uint8_t sck, uint8_t cs,
     zapp_spi_ready = true;
 }
 
+static uint32_t cs_ready;   // pins already set up as chip selects
+
 bool hal_spi_exchange(uint8_t cs_pin, const uint8_t *tx, uint8_t *rx, uint8_t len) {
-    static uint32_t cs_ready;   // pins already set up as chip selects
     if (!zapp_spi_ready || cs_pin >= 30) return false;
     if (!(cs_ready & (1u << cs_pin))) {
+        use_pin(cs_pin);
         gpio_init(cs_pin);
         gpio_set_dir(cs_pin, GPIO_OUT);
         cs_ready |= 1u << cs_pin;
@@ -215,6 +232,8 @@ void hal_uart_init(uint8_t tx, uint8_t rx, uint32_t baud, uint8_t bits, uint8_t 
     zapp_uart = (((tx >> 2) & 1) ^ ((tx >> 3) & 1)) ? uart1 : uart0;
 
     uart_init(zapp_uart, baud);
+    use_pin(tx);
+    use_pin(rx);
     gpio_set_function(tx, GPIO_FUNC_UART);
     gpio_set_function(rx, GPIO_FUNC_UART);
 
@@ -317,6 +336,7 @@ void hal_adc_init(uint8_t pin) {
         adc_init();
         adc_started = true;
     }
+    use_pin(pin);
     adc_gpio_init(pin);
 }
 
@@ -364,6 +384,7 @@ void hal_neopixel_init(uint8_t pin, uint16_t count) {
 
     neo.offset = (uint)pio_add_program(pio0, &ws2812_program);
     neo.sm = 0;
+    use_pin(pin);
     pio_gpio_init(pio0, pin);
     pio_sm_set_consecutive_pindirs(pio0, neo.sm, pin, 1, true);
 
@@ -408,4 +429,39 @@ void hal_neopixel_show(uint8_t pin) {
         pio_sm_put_blocking(pio0, neo.sm, grb << 8u);   // left-aligned 24 bits
     }
     sleep_us(60);   // WS2812 latch/reset gap
+}
+
+void hal_reset(void) {
+    if (neo.ready) {
+        for (uint16_t i = 0; i < neo.count; i++) pio_sm_put_blocking(pio0, neo.sm, 0);   // pixels dark
+        while (!pio_sm_is_tx_fifo_empty(pio0, neo.sm)) tight_loop_contents();
+        sleep_us(100);   // last pixel shifted out, then the latch gap
+        pio_sm_set_enabled(pio0, neo.sm, false);
+        pio_remove_program(pio0, &ws2812_program, neo.offset);
+        neo.ready = false;
+    }
+    neo.brightness = 255;
+    memset(neo.px, 0, sizeof(neo.px));
+
+    if (zapp_i2c_ready) { i2c_deinit(zapp_i2c); zapp_i2c_ready = false; }
+    if (zapp_spi_ready) { spi_deinit(zapp_spi); zapp_spi_ready = false; }
+    cs_ready = 0;
+    if (uart_rx_irq >= 0) {
+        uart_set_irq_enables(zapp_uart, false, false);
+        irq_set_enabled(uart_rx_irq, false);
+        irq_remove_handler(uart_rx_irq, uart_rx_isr);
+        uart_rx_irq = -1;
+    }
+    if (zapp_uart_ready) { uart_deinit(zapp_uart); zapp_uart_ready = false; }
+
+#ifdef ZAPP_HAS_RADIO
+    pins_used &= ~((1u << 23) | (1u << 24) | (1u << 25) | (1u << 29));   // the Wi-Fi chip's
+#endif
+    for (uint pin = 0; pin < 30; pin++) {
+        if (!(pins_used & (1u << pin))) continue;
+        pwm_set_enabled(pwm_gpio_to_slice_num(pin), false);
+        gpio_disable_pulls(pin);
+        gpio_deinit(pin);   // back to an unconnected input, like at power-on
+    }
+    pins_used = 0;
 }

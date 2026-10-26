@@ -1,6 +1,6 @@
-# Pico W: become a Wi-Fi network and serve a page from the drive
+# Become a Wi-Fi network and serve a page from the drive
 # Put your page in web/index.html on the Zapp drive
-# Build the radio firmware first: cmake .. -DZAPP_BOARD=pico_w
+# Needs a board with Wi-Fi: Pico W or any ESP32-S3.
 
 start wifi "Zapp" with "zapp1234"
 serve web

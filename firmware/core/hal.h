@@ -10,6 +10,11 @@
 // Init
 void hal_board_init(void);
 
+// Put back everything a program set up: pins released, PWM, buses and
+// NeoPixels stopped. Runs before each program, so nothing from the last one
+// keeps going alongside the new one.
+void hal_reset(void);
+
 // GPIO
 void     hal_gpio_set_output(uint8_t pin);
 void     hal_gpio_set_input(uint8_t pin);

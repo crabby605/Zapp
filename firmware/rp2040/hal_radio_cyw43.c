@@ -411,3 +411,19 @@ void hal_radio_poll(void) {
     // poll-mode build working too and costs nothing when there's no work.
     cyw43_arch_poll();
 }
+
+void hal_ble_reset(void);   // hal_ble_cyw43.c
+
+void hal_radio_reset(void) {
+    hal_ble_reset();
+    if (!radio_started) return;
+    cyw43_arch_lwip_begin();
+    if (web_pcb) { tcp_close(web_pcb); web_pcb = NULL; }   // pages already being sent finish
+    if (dhcp_pcb) { udp_remove(dhcp_pcb); dhcp_pcb = NULL; }
+    cyw43_arch_lwip_end();
+    memset(lease_mac, 0, sizeof(lease_mac));
+    if (ap_up) { cyw43_arch_disable_ap_mode(); ap_up = false; }
+    cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+    wifi_joined = false;
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+}

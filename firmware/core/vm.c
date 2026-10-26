@@ -868,6 +868,7 @@ void vm_run(const uint8_t *bytecode, uint16_t len) {
     vm_ctx.call_depth = 0;
     vm_ctx.halted = false;
     vm_fail_msg[0] = 0;
+    display.initialized = false;   // the last program's screen isn't this one's
     vm_rng_state ^= (uint32_t)hal_time_us() | 1u;   // random() differs run to run
     if (!vm_rng_state) vm_rng_state = 0x9E3779B9u;
     // vm_halt_signal is cleared by the caller (vm_clear_halt) before the run is

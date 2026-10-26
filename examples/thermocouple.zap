@@ -1,8 +1,8 @@
 # Read a K-type thermocouple through a MAX31855 over SPI
-# Wiring: MISO -> GP16, SCK -> GP18, CS -> GP17 (MOSI unused by this chip)
+# Wiring: MISO and SCK to your board's SPI pins, CS -> A0 (MOSI unused by this chip)
 
 config:
-    spi mosi=19 miso=16 sck=18 cs=17
+    spi mosi=MOSI miso=MISO sck=SCK cs=A0
 
 use max31855
 

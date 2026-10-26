@@ -71,5 +71,7 @@ bool hal_ble_message(char *out, size_t out_len) {
     return false;
 }
 
+void hal_radio_reset(void) {}
+
 void hal_radio_poll(void) {
 }

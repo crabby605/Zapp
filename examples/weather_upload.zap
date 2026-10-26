@@ -1,5 +1,5 @@
-# Pico W: read a BMP280 and post the temperature to a web endpoint
-# Build the radio firmware first: cmake .. -DZAPP_BOARD=pico_w
+# Read a BMP280 and post the temperature to a web endpoint
+# Needs a board with Wi-Fi: Pico W or any ESP32-S3.
 # Wiring: SDA and SCL to your board's I2C pins (pick the board in the IDE)
 
 use bmp280

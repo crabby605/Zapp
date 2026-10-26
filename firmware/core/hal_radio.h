@@ -16,6 +16,10 @@
 // instead of silently doing nothing.
 bool hal_radio_available(void);
 
+// Shut down what the last program started: access point, web server, Wi-Fi
+// connection and Bluetooth advertising. Runs before each program, like hal_reset().
+void hal_radio_reset(void);
+
 // Join an access point. Blocks until associated or the timeout expires.
 bool hal_wifi_connect(const char *ssid, const char *password, uint32_t timeout_ms);
 bool hal_wifi_connected(void);

@@ -413,10 +413,12 @@ describe('displays', () => {
 
 describe('examples', () => {
     const examples = fs.readdirSync(path.join(root, 'examples'));
+    // Examples use pin names (LED, BUTTON, NEOPIXEL, A0, SDA…); this board has them all.
+    const feather = parseBoardFile(fs.readFileSync(path.join(root, 'boards', 'feather_rp2040.zappboard'), 'utf8'));
 
     test.each(examples)('%s compiles and runs', (file) => {
         const src = fs.readFileSync(path.join(root, 'examples', file), 'utf8');
-        expect(() => run(src, [], pico)).not.toThrow();   // examples use the board's own I2C pins
+        expect(() => run(src, [], feather)).not.toThrow();
     });
 });
 

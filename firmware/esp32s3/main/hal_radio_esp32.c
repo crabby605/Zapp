@@ -250,6 +250,7 @@ static const ble_uuid128_t nus_tx = BLE_UUID128_INIT(   // board notifies here
 static bool ble_started = false;
 static volatile bool ble_synced = false;
 static volatile uint16_t connection = BLE_HS_CONN_HANDLE_NONE;
+static volatile bool ble_wanted = false;   // advertise again after a disconnect
 static uint16_t tx_handle;
 static uint8_t own_addr_type;
 static char adv_name[32];
@@ -285,6 +286,7 @@ static const struct ble_gatt_svc_def gatt_services[] = {
 static int gap_event(struct ble_gap_event *event, void *arg);
 
 static void advertise(void) {
+    if (!ble_wanted) return;
     struct ble_hs_adv_fields fields = { 0 };
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     fields.name = (uint8_t *)adv_name;
@@ -338,6 +340,7 @@ bool hal_ble_available(void) {
 
 bool hal_ble_advertise(const char *name) {
     snprintf(adv_name, sizeof(adv_name), "%s", name);
+    ble_wanted = true;
     if (ble_started) {
         if (ble_synced && connection == BLE_HS_CONN_HANDLE_NONE) {
             ble_gap_adv_stop();
@@ -385,4 +388,18 @@ bool hal_ble_message(char *out, size_t out_len) {
     snprintf(out, out_len, "%s", inbox);
     inbox_full = false;   // each message is delivered once
     return true;
+}
+
+void hal_radio_reset(void) {
+    if (ble_started && ble_synced) {
+        ble_wanted = false;
+        ble_gap_adv_stop();
+        if (connection != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(connection, BLE_ERR_REM_USER_CONN_TERM);
+    }
+    if (web) { httpd_stop(web); web = NULL; }
+    if (!radio_started) return;
+    want_sta = false;   // don't rejoin when the disconnect event comes in
+    esp_wifi_disconnect();
+    xEventGroupClearBits(wifi_events, GOT_IP);
+    if (ap_up) { esp_wifi_set_mode(WIFI_MODE_STA); ap_up = false; }
 }

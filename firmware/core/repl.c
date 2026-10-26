@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "config.h"
 #include "hal.h"
+#include "hal_radio.h"
 #include "port.h"
 #include "repl.h"
 #include "vm.h"
@@ -185,6 +186,9 @@ static void vm_core_entry(void) {
         uint16_t len = run_len;
         run_pending = false;
 
+        // A fresh start: nothing the last program set up outlives it.
+        hal_reset();
+        hal_radio_reset();
         vm_run(bc, len);
         __atomic_thread_fence(__ATOMIC_SEQ_CST);
         run_done = true;

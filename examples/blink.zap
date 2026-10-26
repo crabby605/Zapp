@@ -1,8 +1,9 @@
-# Blink the onboard LED on a Raspberry Pi Pico
-# Pin 25 is the built-in LED on RP2040 boards
+# Blink the board's LED
+# LED is whichever pin your board's LED is on (pick the board next to Run).
+# Board with only a NeoPixel? Try pixels.zap.
 
 repeat forever:
-    set pin 25 high
+    set pin LED high
     sleep 500ms
-    set pin 25 low
+    set pin LED low
     sleep 500ms

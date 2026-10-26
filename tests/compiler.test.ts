@@ -130,8 +130,9 @@ describe('errors', () => {
 describe('examples', () => {
     test.each(fs.readdirSync(path.join(root, 'examples')))('%s compiles', (file) => {
         const src = fs.readFileSync(path.join(root, 'examples', file), 'utf8');
-        const pico = parseBoardFile(fs.readFileSync(path.join(root, 'boards', 'pico.zappboard'), 'utf8'));
-        const payload = compileSourceToPayload(src, modules, pico);   // examples use the board's I2C pins
+        // Examples use pin names (LED, BUTTON, NEOPIXEL, A0, SDA…); this board has them all.
+        const feather = parseBoardFile(fs.readFileSync(path.join(root, 'boards', 'feather_rp2040.zappboard'), 'utf8'));
+        const payload = compileSourceToPayload(src, modules, feather);
         expect(payload.startsWith('BC:')).toBe(true);
         expect(byteLength(payload)).toBeLessThanOrEqual(2048);   // firmware buffer
     });

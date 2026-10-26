@@ -289,9 +289,11 @@ export function FileManager({ tree, activePath, dirty, onOpen, onCreate, onRenam
 
 // Read-only examples, kept apart from your own programs. Opening one shows it;
 // the copy button puts an editable copy in My programs.
-export function Examples({ examples, activePath, onOpen, onCopy }: {
+export function Examples({ examples, activePath, notes, onOpen, onCopy }: {
     examples: FileEntry[];
     activePath: string | null;
+    /** Example path → why it won't run on the picked board. */
+    notes: Record<string, string>;
     onOpen: (path: string) => void;
     onCopy: (path: string) => void;
 }) {
@@ -303,8 +305,11 @@ export function Examples({ examples, activePath, onOpen, onCopy }: {
                    onChange={(e) => setFilter(e.target.value)} aria-label="Filter examples" />
             <ul className="list">
                 {shown.map((f) => (
-                    <li key={f.path} className={activePath === f.path ? 'active' : ''}>
-                        <button className="item" onClick={() => onOpen(f.path)}>{pretty(f.name)}</button>
+                    <li key={f.path} className={[activePath === f.path ? 'active' : '', notes[f.path] ? 'unfit' : ''].join(' ')}>
+                        <button className="item" onClick={() => onOpen(f.path)} title={notes[f.path]}>
+                            {pretty(f.name)}
+                            {notes[f.path] && <span className="item-note">{notes[f.path]}</span>}
+                        </button>
                         <span className="item-actions">
                             <button className="icon-btn" title="Copy to My programs" onClick={() => onCopy(f.path)}><IconCopy size={12} /></button>
                         </span>

@@ -28,11 +28,16 @@
 enum { PIN_UNSET, PIN_IN, PIN_OUT, PIN_PWM };
 static uint8_t pin_mode[ZAPP_GPIO_COUNT];
 
+// Pins the running program has touched, so hal_reset() releases exactly those.
+static uint64_t pins_used;
+static void use_pin(uint8_t pin) { if (pin < ZAPP_GPIO_COUNT) pins_used |= 1ull << pin; }
+
 void hal_board_init(void) {
 }
 
 void hal_gpio_set_output(uint8_t pin) {
     if (pin >= ZAPP_GPIO_COUNT || pin_mode[pin] == PIN_OUT) return;
+    use_pin(pin);
     gpio_reset_pin(pin);
     gpio_set_direction(pin, GPIO_MODE_INPUT_OUTPUT);   // input too, so it can be read back
     pin_mode[pin] = PIN_OUT;
@@ -40,6 +45,7 @@ void hal_gpio_set_output(uint8_t pin) {
 
 void hal_gpio_set_input(uint8_t pin) {
     if (pin >= ZAPP_GPIO_COUNT || pin_mode[pin] == PIN_IN) return;
+    use_pin(pin);
     gpio_reset_pin(pin);   // leaves the pull-up on, which suits buttons to ground
     gpio_set_direction(pin, GPIO_MODE_INPUT);
     pin_mode[pin] = PIN_IN;
@@ -97,6 +103,7 @@ static void pwm_output(uint8_t pin, ledc_timer_t timer, uint32_t duty) {
         pin_channel[pin] = ++channels_used;
     }
     ledc_channel_t ch = (ledc_channel_t)(pin_channel[pin] - 1);
+    use_pin(pin);
 
     if (pin_mode[pin] == PIN_PWM && channel_timer[ch] == timer) {
         ledc_set_duty(LEDC_LOW_SPEED_MODE, ch, duty);
@@ -172,6 +179,8 @@ void hal_i2c_init(uint8_t sda, uint8_t scl, uint32_t freq_hz) {
         return;
     }
     i2c_freq = freq_hz ? freq_hz : 100000;
+    use_pin(sda);
+    use_pin(scl);
     pin_mode[sda] = pin_mode[scl] = PIN_UNSET;
 }
 
@@ -261,6 +270,9 @@ void hal_spi_init(uint8_t mosi, uint8_t miso, uint8_t sck, uint8_t cs,
         .queue_size = 1,
     };
     spi_bus_add_device(SPI2_HOST, &dev, &spi_dev);
+    use_pin(mosi);
+    use_pin(miso);
+    use_pin(sck);
     pin_mode[mosi] = pin_mode[miso] = pin_mode[sck] = PIN_UNSET;
     if (cs < ZAPP_GPIO_COUNT) {   // 0xFF: no default chip select, programs name one per call
         hal_gpio_set_output(cs);
@@ -420,6 +432,7 @@ void hal_adc_init(uint8_t pin) {
     adc_oneshot_chan_cfg_t c = { .atten = ADC_ATTEN_DB_12, .bitwidth = ADC_BITWIDTH_12 };
     if (adc_oneshot_config_channel(adc_units[unit], chan, &c) == ESP_OK) {
         adc_pins_ready |= 1u << pin;
+        use_pin(pin);
         pin_mode[pin] = PIN_UNSET;
     }
 }
@@ -496,6 +509,7 @@ void hal_neopixel_init(uint8_t pin, uint16_t count) {
         hal_debug_println("Hardware Error: NeoPixel could not start on that pin");
         return;
     }
+    use_pin(pin);
     pin_mode[pin] = PIN_UNSET;
 }
 
@@ -529,4 +543,44 @@ void hal_neopixel_show(uint8_t pin) {
     rmt_transmit(neo.chan, neo.encoder, frame, n, &t);
     rmt_tx_wait_all_done(neo.chan, 100);
     esp_rom_delay_us(60);   // WS2812 latch/reset gap
+}
+
+void hal_reset(void) {
+    if (neo.chan) {
+        static const uint8_t dark[NEO_MAX_PIXELS * 3];
+        rmt_transmit_config_t t = { .loop_count = 0 };
+        rmt_transmit(neo.chan, neo.encoder, dark, (size_t)neo.count * 3, &t);
+        rmt_tx_wait_all_done(neo.chan, 100);
+        rmt_disable(neo.chan);
+        rmt_del_channel(neo.chan);
+        rmt_del_encoder(neo.encoder);
+        neo.chan = NULL;
+        neo.encoder = NULL;
+    }
+    neo.brightness = 255;
+    memset(neo.px, 0, sizeof(neo.px));
+
+    for (uint8_t pin = 0; pin < ZAPP_GPIO_COUNT; pin++) {
+        if (pin_channel[pin]) ledc_stop(LEDC_LOW_SPEED_MODE, (ledc_channel_t)(pin_channel[pin] - 1), 0);
+    }
+    memset(pin_channel, 0, sizeof(pin_channel));
+    channels_used = 0;
+    memset(timer_freq, 0, sizeof(timer_freq));
+
+    if (i2c_bus) {
+        for (uint8_t i = 0; i < i2c_dev_count; i++) if (i2c_devs[i].dev) i2c_master_bus_rm_device(i2c_devs[i].dev);
+        i2c_dev_count = i2c_dev_next = 0;
+        i2c_del_master_bus(i2c_bus);
+        i2c_bus = NULL;
+    }
+    if (spi_dev) { spi_bus_remove_device(spi_dev); spi_dev = NULL; }
+    if (spi_bus_up) { spi_bus_free(SPI2_HOST); spi_bus_up = false; }
+    if (uart_ready) { uart_driver_delete(ZAPP_UART); uart_ready = false; }
+    adc_pins_ready = 0;   // the pins are reset below, so their channels get set up again
+
+    for (uint8_t pin = 0; pin < ZAPP_GPIO_COUNT; pin++) {
+        if (pins_used & (1ull << pin)) gpio_reset_pin(pin);   // input with pull-up, like at power-on
+    }
+    pins_used = 0;
+    memset(pin_mode, 0, sizeof(pin_mode));
 }

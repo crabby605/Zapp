@@ -80,6 +80,15 @@ function errorLine(message: string): number | null {
 const cleanError = (message: string) => message.replace(/ at line \d+/, '').replace(/^\[\d+:\d+\]\s*/, '');
 const pretty = (path: string) => ws.fileName(path).replace(/\.zap$/, '').replace(/[_-]+/g, ' ');
 
+// Why an example can't run on the picked board, in a few words for the list.
+const unfitReason = (message: string) => {
+    const pin = /Unknown pin '(\w+)'/.exec(message);
+    if (pin) return `No ${pin[1]} on this board`;
+    if (/I2C pins|I2C needs/.test(message)) return 'This board has no I2C pins named';
+    if (/no radio/i.test(message)) return 'Needs a board with a radio';
+    return cleanError(message).split('\n')[0]!;
+};
+
 export function Workbench() {
     const [tree, setTree] = useState<ws.FileTree | null>(null);
     const [buffers, setBuffers] = useState<Record<string, ws.Buffer>>({});
@@ -206,6 +215,24 @@ export function Workbench() {
     }, [refreshTree, loadModules]);
 
     useEffect(() => { ws.saveSession({ open, active: panes.left }); }, [open, panes.left]);
+
+    // Examples are written with pin names (LED, BUTTON, SDA…); the list says
+    // which ones the picked board can't run, and why.
+    const [exampleSource, setExampleSource] = useState<Record<string, string>>({});
+    useEffect(() => {
+        for (const f of tree?.examples ?? []) {
+            if (exampleSource[f.path] !== undefined) continue;
+            ws.readFile(f.path).then((file) => setExampleSource((prev) => ({ ...prev, [f.path]: file.content })), () => undefined);
+        }
+    }, [tree?.examples]);
+    const exampleNotes = useMemo(() => {
+        if (!board) return {};
+        const notes: Record<string, string> = {};
+        for (const [path, src] of Object.entries(exampleSource)) {
+            try { compileWithWarnings(src, library, board); } catch (e) { notes[path] = unfitReason(e instanceof Error ? e.message : String(e)); }
+        }
+        return notes;
+    }, [exampleSource, library, board]);
     // Boards are plugged in and out: look for the drive while My programs is showing.
     // Hosted, the server never sees a drive, so there's nothing to look for.
     useEffect(() => {
@@ -996,7 +1023,7 @@ export function Workbench() {
                                              onCopy={(p, d) => void copyEntry(p, d)}
                                              onMenu={(e, items) => setCtx({ x: e.clientX, y: e.clientY, items })} />
                             ) : tool === 'examples' ? (
-                                <Examples examples={tree?.examples ?? []} activePath={active}
+                                <Examples examples={tree?.examples ?? []} activePath={active} notes={exampleNotes}
                                           onOpen={(p) => void openPath(p)} onCopy={(p) => void copyExample(p)} />
                             ) : tool === 'modules' ? (
                                 <ModuleManager library={library} installed={installed} busy={moduleBusy}

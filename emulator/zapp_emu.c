@@ -120,6 +120,9 @@ static void budget_check(void) {
 }
 
 void hal_board_init(void) {}
+// Each run is its own process, so there's nothing left over to reset.
+void hal_reset(void) {}
+void hal_radio_reset(void) {}
 
 // GPIO
 void hal_gpio_set_output(uint8_t pin) { (void)pin; }

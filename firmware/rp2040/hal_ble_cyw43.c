@@ -173,3 +173,13 @@ bool hal_ble_message(char *out, size_t out_len) {
     ble_unlock();
     return true;
 }
+
+// Stop advertising and drop any phone connected; hal_radio_reset() calls this.
+void hal_ble_reset(void) {
+    if (!ble_started) return;
+    ble_lock();
+    gap_advertisements_enable(0);
+    if (connection != HCI_CON_HANDLE_INVALID) gap_disconnect(connection);
+    inbox_full = false;
+    ble_unlock();
+}
