@@ -6,6 +6,7 @@ name    = "pico_w"
 chip    = "rp2040"
 title   = "Raspberry Pi Pico W"
 install = "Unplug it, hold the white BOOTSEL button, and plug it back in"
+radio   = "wifi ble"
 [pins]
 LED            = 32
 A0             = 26
@@ -46,3 +47,8 @@ MOSI           = 7
 MISO           = 8
 [indicators]
 LED            = "led"
+[reserved]
+23             = "is wired to the Wi-Fi chip"
+24             = "is wired to the Wi-Fi chip"
+25             = "is wired to the Wi-Fi chip"
+29             = "is wired to the Wi-Fi chip"

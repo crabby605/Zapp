@@ -1,13 +1,15 @@
 import { Lexer } from './lexer';
 import { ParserEmitter, ModuleDefinition } from './emitter';
+import { BoardDefinition } from './board';
+import type { Warning } from './quirks';
 export { parseModuleFile } from './modfile';
 export { parseBoardFile } from './board';
 export type { BoardDefinition, Indicator } from './board';
-import { BoardDefinition } from './board';
+export type { Warning } from './quirks';
 // './project' is Node-only (fs) — import it directly, never re-export it here,
 // or browser bundles of this module (ide/) fail to resolve 'fs'.
 
-// The firmware's USB IDs (src/usb_device.c): TinyUSB's VID with the CDC+MSC
+// The firmware's USB IDs (firmware/core/usb_device.c): TinyUSB's VID with the CDC+MSC
 // PID bits. Other TinyUSB gadgets share the VID, so match the pair.
 export const ZAPP_USB = { vendorId: 0xCAFE, productId: 0x4003 };
 
@@ -22,7 +24,7 @@ export function findZappPorts<T extends PortInfo>(ports: T[]): T[] {
         .sort((a, b) => Number(b.manufacturer === 'Zapp') - Number(a.manufacturer === 'Zapp'));
 }
 
-// Identify handshake (include/config.h): send ZAPP_PROBE, a Zapp board answers
+// Identify handshake (firmware/core/config.h): send ZAPP_PROBE, a Zapp board answers
 // "ZPPI ZAPP:<chip>:<variant>:<flash>:<ram>:<board>" in any mode. It also sends
 // that line by itself when the port is opened.
 export const ZAPP_PROBE = 'ZPP?';
@@ -91,6 +93,13 @@ export const BUILTIN_MODULES: Record<string, ModuleDefinition> = {
 
 export function compileSourceToPayload(code: string, modules: Record<string, ModuleDefinition> = BUILTIN_MODULES,
                                       board?: BoardDefinition): string {
-    const tokens = new Lexer(code).tokenize();
-    return toPayload(new ParserEmitter(tokens, { modules, board }).compile());
+    return compileWithWarnings(code, modules, board).payload;
+}
+
+/** Compile, plus what will behave differently on the real board (see quirks.ts). */
+export function compileWithWarnings(code: string, modules: Record<string, ModuleDefinition> = BUILTIN_MODULES,
+                                    board?: BoardDefinition): { payload: string; warnings: Warning[] } {
+    const emitter = new ParserEmitter(new Lexer(code).tokenize(), { modules, board });
+    const payload = toPayload(emitter.compile());
+    return { payload, warnings: emitter.warnings() };
 }

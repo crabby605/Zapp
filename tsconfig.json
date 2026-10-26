@@ -4,5 +4,6 @@
     "module": "CommonJS",
     "strict": true,
     "types": ["jest", "node"]
-  }
+  },
+  "exclude": ["node_modules", "firmware", "ide"]
 }

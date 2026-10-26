@@ -9,7 +9,7 @@ import * as path from 'path';
 export type FirmwareVariant = 'core' | 'pico_w';
 
 export const firmwarePath = (repoRoot: string, variant: FirmwareVariant) =>
-    path.join(repoRoot, variant === 'pico_w' ? 'build-picow' : 'build', 'zapp.uf2');
+    path.join(repoRoot, 'firmware', 'rp2040', variant === 'pico_w' ? 'build-picow' : 'build', 'zapp.uf2');
 
 // Where removable drives get mounted on each OS.
 function mountRoots(): string[] {
@@ -26,6 +26,16 @@ function candidates(): string[] {
     return mountRoots().flatMap((root) => {
         try { return fs.readdirSync(root).map((name) => path.join(root, name)); } catch { return []; }
     });
+}
+
+/** A running Zapp board's own USB drive, or null. Its boot_out.txt starts "Zapp v". */
+export function findZappDrive(): string | null {
+    for (const dir of candidates()) {
+        try {
+            if (fs.readFileSync(path.join(dir, 'boot_out.txt'), 'utf8').startsWith('Zapp v')) return dir;
+        } catch { /* not a Zapp drive */ }
+    }
+    return null;
 }
 
 /** The mounted UF2 bootloader drive, or null. It always holds INFO_UF2.TXT. */

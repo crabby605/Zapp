@@ -103,7 +103,7 @@ export const OP = {
     HALT: 0xFF,
 } as const;
 
-// Transform ids — must match the TransformId enum in src/vm.c.
+// Transform ids — must match the TransformId enum in firmware/core/vm.c.
 export const TRANSFORM_IDS: Record<string, number> = {
     raw_u8: 0x00,
     raw_u16_be: 0x01,
@@ -122,7 +122,7 @@ export const TRANSFORM_IDS: Record<string, number> = {
     mpu6050_gyro: 0x0E,
 };
 
-// Stream parser ids — must match the PARSER_NMEA_* defines in src/vm.c.
+// Stream parser ids — must match the PARSER_NMEA_* defines in firmware/core/vm.c.
 export const PARSER_IDS: Record<string, number> = {
     nmea_gga_lat: 0x01,
     nmea_gga_lon: 0x02,

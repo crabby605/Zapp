@@ -1,8 +1,10 @@
 import { BoardDefinition, Indicator } from './board';
 import { Token, TokenType } from './lexer';
 import { OP, TRANSFORM_IDS, PARSER_IDS, HID_MODIFIERS, HID_MOUSE_BUTTONS, hidKeycode } from './opcodes';
+import { emptyUsage, hardwareWarnings, type PinUse, type Warning } from './quirks';
+import { FIELD_FORMATS } from './modfile';
 
-// Ids match DISPLAY_CONTROLLER_* in src/vm.c. The firmware detects the real
+// Ids match DISPLAY_CONTROLLER_* in firmware/core/vm.c. The firmware detects the real
 // chip at startup; this is only the fallback if detection can't tell.
 const DISPLAY_CONTROLLERS: Record<string, number> = {
     auto: 0x00,
@@ -19,7 +21,7 @@ const COLORS: Record<string, [number, number, number]> = {
     pink: [255, 60, 120], off: [0, 0, 0], black: [0, 0, 0],
 };
 
-// abs(x), min(a, b)... Ids match MathFn in src/vm.c. One-argument functions
+// abs(x), min(a, b)... Ids match MathFn in firmware/core/vm.c. One-argument functions
 // also work without brackets: `round temp`.
 const MATH_FUNCTIONS: Record<string, { id: number; argc: number }> = {
     abs: { id: 0, argc: 1 }, round: { id: 1, argc: 1 }, floor: { id: 2, argc: 1 },
@@ -52,10 +54,19 @@ export interface ModuleFieldDefinition {
     bit_mask?: number;
     bit_shift?: number;
     scale?: number;
+    // Register fields described in the module file instead of a named transform
+    format?: string;     // "u8", "i16_be", "u24_le"... see FIELD_FORMATS in modfile.ts
+    shift?: number;      // drop this many low bits
+    bits?: number;       // keep this many bits (sign kept for signed formats)
+    mask?: number;       // keep only these bits
+    offset?: number;     // added after scale
 }
 
 export interface ModuleDefinition {
     name: string;
+    version?: string;        // [module] metadata, shown by the IDE's module manager
+    description?: string;
+    author?: string;
     interface: 'i2c' | 'uart' | 'spi' | 'display' | string;
     i2c?: {
         addr_default: number;
@@ -113,6 +124,7 @@ export class ParserEmitter {
     private initializedModules = new Set<string>();
 
     private board: BoardDefinition | undefined;
+    private usage = emptyUsage();   // what the program touches, for hardwareWarnings
 
     constructor(tokens: Token[], options: ParserEmitterOptions = {}) {
         this.tokens = tokens;
@@ -126,6 +138,15 @@ export class ParserEmitter {
         }
         this.emitByte(OP.HALT);
         return new Uint8Array(this.bytes);
+    }
+
+    // Call after compile(): what won't behave the same on the real board.
+    public warnings(): Warning[] {
+        return hardwareWarnings(this.board, this.usage);
+    }
+
+    private lastLine(): number {
+        return this.tokens[this.current - 1]?.line ?? 1;
     }
 
     // Statements
@@ -175,7 +196,8 @@ export class ParserEmitter {
                 return this.parseStartWifi();
             }
             if (name === 'serve' && this.peekNext()?.value === 'web') {
-                this.advance();
+                const line = this.advance().line;
+                this.usage.wifi ??= line;
                 this.advance();
                 this.emitByte(OP.WEB_SERVE);
                 this.emitByte(OP.POP);
@@ -197,6 +219,7 @@ export class ParserEmitter {
             }
             if (name === 'advertise') {
                 const line = this.advance().line;
+                this.usage.ble ??= line;
                 const bleName = this.consume(TokenType.STRING, "Expected a name to advertise");
                 this.emitByte(OP.BLE_ADVERTISE);
                 this.emitInlineString(bleName.value, 26, line);
@@ -204,7 +227,8 @@ export class ParserEmitter {
                 return;
             }
             if (name === 'notify') {
-                this.advance();
+                const line = this.advance().line;
+                this.usage.ble ??= line;
                 this.parseExpression();          // any value, sent as text
                 this.emitByte(OP.BLE_NOTIFY);
                 this.emitByte(OP.POP);
@@ -248,6 +272,7 @@ export class ParserEmitter {
     }
 
     private emitI2cInit(sda: number, scl: number) {
+        this.usage.i2c ??= this.lastLine();
         this.emitByte(OP.I2C_INIT);
         this.emitByte(sda);
         this.emitByte(scl);
@@ -317,6 +342,7 @@ export class ParserEmitter {
             throw new Error(`Only 'connect wifi' is supported at line ${what.line}`);
         }
         this.consume(TokenType.TO, `Say which network: connect wifi to "name" with "password" (line ${what.line})`);
+        this.usage.wifi ??= what.line;
         this.emitByte(OP.WIFI_CONNECT);
         this.emitWifiCredentials(what.line, 'connect wifi to');
     }
@@ -324,6 +350,7 @@ export class ParserEmitter {
     // start wifi "SSID" [with "PSK"]  — the board becomes the access point.
     private parseStartWifi() {
         const line = this.advance().line;
+        this.usage.wifi ??= line;
         this.emitByte(OP.WIFI_AP);
         this.emitWifiCredentials(line, 'start wifi');
     }
@@ -345,8 +372,10 @@ export class ParserEmitter {
 
     // http get "url" / http post "url" "body" — an expression that yields text.
     private emitHttpRequest(line: number) {
+        this.usage.wifi ??= line;
         if (this.match(TokenType.GET)) {
             const url = this.consume(TokenType.STRING, "Expected a url after 'http get'");
+            if (url.value.startsWith('https://')) this.usage.https.push(line);
             this.emitByte(OP.HTTP_GET);
             this.emitInlineString(url.value, 127, line);
             return;
@@ -356,6 +385,8 @@ export class ParserEmitter {
             throw new Error(`Expected 'get' or 'post' after 'http' at line ${verb.line}`);
         }
         const url = this.consume(TokenType.STRING, "Expected a url after 'http post'");
+        this.usage.httpPost.push(line);
+        if (url.value.startsWith('https://')) this.usage.https.push(line);
         const body = this.consume(TokenType.STRING, "Expected a body after the url");
         this.emitByte(OP.HTTP_POST);
         this.emitInlineString(url.value, 127, line);
@@ -563,6 +594,7 @@ export class ParserEmitter {
         else throw new Error(`Expected 'high' or 'low' at line ${this.peek().line}`);
         // Named active-low LEDs: `high` means lit, whatever the wiring.
         if (indicator?.activeLow) state ^= 1;
+        if (state && pin !== PIN_FROM_STACK) this.usage.driven.add(pin);
 
         this.emitByte(OP.GPIO_WRITE);
         this.emitByte(pin);
@@ -640,6 +672,7 @@ export class ParserEmitter {
         if (this.match(TokenType.ANALOG)) {
             this.consume(TokenType.PIN, "Expected 'pin'");
             const pin = this.parsePinOperand();
+            this.recordLastPin(this.usage.analog);
             let asVoltage = false;
             if (this.match(TokenType.AS)) {
                 this.consume(TokenType.VOLTAGE, "Expected 'voltage' after 'as'");
@@ -743,6 +776,7 @@ export class ParserEmitter {
             this.consume(TokenType.HZ, "Expected 'hz'");
         }
 
+        if (duty !== 0) this.recordLastPin(this.usage.pwm, { freq });
         if (duty === 0) {
             this.emitByte(OP.PWM_OFF);
             this.emitByte(pin);
@@ -761,6 +795,7 @@ export class ParserEmitter {
             this.consume(TokenType.ON, "Expected 'on'");
             this.consume(TokenType.PIN, "Expected 'pin'");
             const pin = this.parsePinOperand();
+            this.recordLastPin(this.usage.pwm);
             this.consume(TokenType.TO, "Expected 'to'");
             const angle = this.signedLiteral("Expected servo angle -90..90");
             this.emitByte(OP.SERVO_SET);
@@ -908,20 +943,45 @@ export class ParserEmitter {
         }
 
         for (const [fieldName, field] of Object.entries(module.fields)) {
-            const transformId = TRANSFORM_IDS[field.transform];
-            if (transformId === undefined) {
+            const format = field.format !== undefined ? FIELD_FORMATS[field.format] : undefined;
+            const transformId = format ? undefined : TRANSFORM_IDS[field.transform];
+            if (!format && transformId === undefined) {
                 throw new Error(`Unsupported transform '${field.transform}' for ${module.name}.${fieldName}`);
             }
 
             this.emitByte(OP.I2C_READ);
             this.emitByte(module.i2c.addr_default);
             this.emitByte(field.reg);
-            this.emitByte(field.len);
-            this.emitByte(OP.TRANSFORM);
-            this.emitByte(transformId);
+            this.emitByte(field.len || (format ? format.bits / 8 : 0));
+            if (format) {
+                this.emitByte(OP.DECODE);
+                this.emitByte((format.signed ? 1 : 0) | (format.little ? 2 : 0));
+                this.emitByte(format.bits);
+            } else {
+                this.emitByte(OP.TRANSFORM);
+                this.emitByte(transformId!);
+            }
+            this.emitFieldMath(field, format?.signed ?? false);
             this.emitByte(OP.STORE);
             this.emitByte(this.getFieldSlot(module.name, fieldName));
         }
+    }
+
+    // shift → bits → mask → scale → offset → bool, as ordinary VM steps.
+    private emitFieldMath(field: ModuleFieldDefinition, signed: boolean) {
+        if (field.shift) { this.emitPushNumber(field.shift); this.emitByte(OP.SHR); }
+        if (field.bits !== undefined && field.bits < 32) {
+            if (signed) {   // move the field's top bit to bit 31 and back: arithmetic shift keeps the sign
+                this.emitPushNumber(32 - field.bits); this.emitByte(OP.SHL);
+                this.emitPushNumber(32 - field.bits); this.emitByte(OP.SHR);
+            } else {
+                this.emitPushNumber(2 ** field.bits - 1); this.emitByte(OP.BAND);
+            }
+        }
+        if (field.mask !== undefined) { this.emitPushNumber(field.mask); this.emitByte(OP.BAND); }
+        if (field.scale !== undefined && field.scale !== 1) { this.emitPushNumber(field.scale); this.emitByte(OP.MUL); }
+        if (field.offset) { this.emitPushNumber(field.offset); this.emitByte(OP.ADD); }
+        if (field.type === 'bool') { this.emitPushNumber(0); this.emitByte(OP.NEQ); }
     }
 
     private emitUartGetData(module: ModuleDefinition, moduleName: Token) {
@@ -1326,6 +1386,7 @@ export class ParserEmitter {
         // wifi connected | wifi ip | http get "url"
         if (this.check(TokenType.IDENTIFIER) && this.peek().value === 'wifi') {
             const wifi = this.advance();
+            this.usage.wifi ??= wifi.line;
             const what = this.consumeName("Expected 'connected' or 'ip' after 'wifi'");
             if (what.value === 'connected') { this.emitByte(OP.WIFI_STATUS); return; }
             if (what.value === 'ip')        { this.emitByte(OP.WIFI_IP);     return; }
@@ -1338,6 +1399,7 @@ export class ParserEmitter {
         // ble connected | ble message
         if (this.check(TokenType.IDENTIFIER) && this.peek().value === 'ble') {
             const ble = this.advance();
+            this.usage.ble ??= ble.line;
             const what = this.consumeName("Expected 'connected' or 'message' after 'ble'");
             if (what.value === 'connected') { this.emitByte(OP.BLE_STATUS);  return; }
             if (what.value === 'message')   { this.emitByte(OP.BLE_MESSAGE); return; }
@@ -1382,13 +1444,19 @@ export class ParserEmitter {
     // named indicator with a power pin emits its power-on write here.
     private parsePin(): { pin: number; indicator?: Indicator | undefined } {
         if (this.check(TokenType.NUMBER)) {
-            return { pin: parseInt(this.advance().value) };
+            const token = this.advance();
+            const pin = parseInt(token.value);
+            this.lastPin = { pin, line: token.line };
+            this.usage.pins.push(this.lastPin);
+            return { pin };
         }
         const token = this.peek();
         if (token.type === TokenType.IDENTIFIER && !this.variables.has(token.value)) {
             const pin = this.board?.pins[token.value];
             if (pin !== undefined) {
                 this.advance();
+                this.lastPin = { pin, name: token.value, line: token.line };
+                this.usage.pins.push(this.lastPin);
                 const indicator = this.board!.indicators[token.value];
                 if (indicator?.power !== undefined) {
                     this.emitByte(OP.GPIO_WRITE);   // e.g. QT Py: NeoPixel needs GP11 high
@@ -1403,12 +1471,19 @@ export class ParserEmitter {
                                 : ' — select a board so pin names like LED resolve'));
             }
         }
+        this.lastPin = null;   // computed at run time: nothing to check
         this.parseExpression();
         return { pin: PIN_FROM_STACK };
     }
 
     private parsePinOperand(): number {
         return this.parsePin().pin;
+    }
+
+    private lastPin: PinUse | null = null;
+
+    private recordLastPin<T extends PinUse>(into: T[], extra?: Omit<T, keyof PinUse>) {
+        if (this.lastPin) into.push({ ...this.lastPin, ...extra } as T);
     }
 
     // A colour: `r g b` (0-255 each) or a name like red / orange / off.

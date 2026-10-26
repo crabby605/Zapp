@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { compileSourceToPayload, findZappPorts, parseBoardFile, parseIdentity } from '../compiler/src/index';
+import { compileSourceToPayload, compileWithWarnings, findZappPorts, parseBoardFile, parseIdentity } from '../compiler/src/index';
 import { parseModuleFile } from '../compiler/src/modfile';
 import { ModuleDefinition } from '../compiler/src/emitter';
 import { Lexer, TokenType } from '../compiler/src/lexer';
@@ -148,8 +148,28 @@ describe('board profiles', () => {
 
     test('every profile parses and names its indicators', () => {
         for (const name of ['pico', 'pico_w', 'xiao_rp2040', 'feather_rp2040', 'qtpy_rp2040',
-                            'itsybitsy_rp2040', 'kb2040', 'tiny2040', 'rp2040_zero']) {
+                            'itsybitsy_rp2040', 'kb2040', 'tiny2040', 'rp2040_zero',
+                            'esp32s3_devkitc', 'esp32s3_devkitc_n8r8', 'feather_esp32s3', 'qtpy_esp32s3', 'xiao_esp32s3',
+                            'esp32s3_zero', 'lolin_s3_mini']) {
             expect(Object.keys(boards[name]!.indicators).length).toBeGreaterThan(0);
+        }
+    });
+
+    test('boards with a radio say so, so the simulator gives them one', () => {
+        const radio = Object.values(boards).filter(b => b.radio).map(b => b.name).sort();
+        expect(radio).toEqual(['esp32s3_devkitc', 'esp32s3_devkitc_n8r8', 'esp32s3_zero', 'feather_esp32s3',
+                               'lolin_s3_mini', 'pico_w', 'qtpy_esp32s3', 'xiao_esp32s3']);
+    });
+
+    test('every ESP32-S3 profile has a firmware build (firmware/esp32s3/boards/<name>)', () => {
+        for (const b of Object.values(boards).filter((b) => b.chip === 'esp32s3')) {
+            expect(fs.existsSync(path.join(root, 'firmware', 'esp32s3', 'boards', b.name, 'sdkconfig.board'))).toBe(true);
+        }
+    });
+
+    test('ESP32-S3 pins stay inside GPIO0-48', () => {
+        for (const b of Object.values(boards).filter(b => b.chip === 'esp32s3')) {
+            for (const gpio of Object.values(b.pins)) expect(gpio).toBeLessThanOrEqual(48);
         }
     });
 
@@ -255,5 +275,75 @@ describe('i2c pins from the board', () => {
 
     test('without a board it says how to give the pins', () => {
         expect(() => compile('use oled\n')).toThrow(/pick your board, or add/);
+    });
+});
+
+describe('hardware quirks', () => {
+    const boards = Object.fromEntries(fs.readdirSync(path.join(root, 'boards'))
+        .filter(f => f.endsWith('.zappboard'))
+        .map(f => {
+            const b = parseBoardFile(fs.readFileSync(path.join(root, 'boards', f), 'utf8'));
+            return [b.name, b];
+        }));
+    const warn = (board: string, src: string) =>
+        compileWithWarnings(src, modules, boards[board]).warnings.map(w => `${w.line}: ${w.message}`);
+
+    test('ADC2 pins warn only when Wi-Fi is on, and point at an ADC1 pin', () => {
+        const src = 'connect wifi to "net"\nnum v = read analog pin A0\n';
+        expect(warn('feather_esp32s3', src)).toEqual([
+            expect.stringMatching(/^2: A0 \(GPIO18\) is on ADC2.*A5 is on ADC1/),
+        ]);
+        expect(warn('feather_esp32s3', 'num v = read analog pin A0\n')).toEqual([]);
+        expect(warn('feather_esp32s3', 'advertise "x"\nnum v = read analog pin A0\n')).toEqual([]);   // BLE is fine
+        expect(warn('feather_esp32s3', src.replace('A0', 'A5'))).toEqual([]);
+    });
+
+    test('pins that have no ADC say which ones do', () => {
+        expect(warn('pico', 'num v = read analog pin 5\n')).toEqual([
+            expect.stringMatching(/pin 5 can't read analog.*use A0, A1, A2/),
+        ]);
+        expect(warn('esp32s3_devkitc', 'num v = read analog pin 40\n')).toHaveLength(1);
+    });
+
+    test('USB and Wi-Fi chip pins are flagged', () => {
+        expect(warn('esp32s3_devkitc', 'set pin 19 high\n')).toEqual([expect.stringMatching(/USB D− line/)]);
+        expect(warn('pico_w', 'set pin 23 high\n')).toEqual([expect.stringMatching(/Wi-Fi chip/)]);
+        expect(warn('pico', 'set pin 23 high\n')).toEqual([]);
+    });
+
+    test('Pico W http limits, and none on the S3', () => {
+        const src = 'connect wifi to "net"\nhttp post "http://x/y" "a=1"\ntext t = http get "https://x"\n';
+        expect(warn('pico_w', src)).toEqual([
+            expect.stringMatching(/^2: .*can't send http post/),
+            expect.stringMatching(/^3: .*can't do https/),
+        ]);
+        expect(warn('xiao_esp32s3', src)).toEqual([]);
+    });
+
+    test('radio code on a board without a radio', () => {
+        expect(warn('pico', 'connect wifi to "net"\n')).toEqual([expect.stringMatching(/no radio/)]);
+        expect(warn('pico_w', 'connect wifi to "net"\n')).toEqual([]);
+    });
+
+    test('S3 PWM pins share a frequency', () => {
+        expect(warn('esp32s3_devkitc', 'pulse 100 on pin 4 at 1000hz\npulse 100 on pin 5 at 50hz\n'))
+            .toEqual([expect.stringMatching(/^2: PWM pins share one frequency/)]);
+        expect(warn('esp32s3_devkitc', 'pulse 100 on pin 4\nmove servo on pin 5 to 0\n')).toEqual([]);
+        expect(warn('pico', 'pulse 100 on pin 4 at 1000hz\npulse 100 on pin 5 at 50hz\n')).toEqual([]);
+    });
+
+    test('Feather S3 STEMMA QT needs I2C_POWER', () => {
+        expect(warn('feather_esp32s3', 'use bmp280\nget data from bmp280\n'))
+            .toEqual([expect.stringMatching(/I2C_POWER high/)]);
+        expect(warn('feather_esp32s3', 'set pin I2C_POWER high\nuse bmp280\nget data from bmp280\n')).toEqual([]);
+    });
+});
+
+describe('module metadata', () => {
+    test('version, description and author come through for the module manager', () => {
+        const m = parseModuleFile(fs.readFileSync(path.join(root, 'modules', 'bmp280.zappmod'), 'utf8'));
+        expect(m.version).toMatch(/^\d+\.\d+\.\d+$/);
+        expect(m.description).toMatch(/BMP280/);
+        expect(m.author).toBe('zapp-lang');
     });
 });

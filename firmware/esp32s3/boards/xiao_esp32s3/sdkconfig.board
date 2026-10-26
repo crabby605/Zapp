@@ -1,0 +1,10 @@
+# 8MB octal PSRAM, 8MB quad flash — from CircuitPython's
+# ports/espressif/boards/seeed_xiao_esp32_s3_sense/mpconfigboard.mk
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+# Start anyway if the chip isn't there.
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+# Only memory Zapp asks for as PSRAM goes there (the drive and the store).
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y

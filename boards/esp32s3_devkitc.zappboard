@@ -1,0 +1,59 @@
+# Pin map from CircuitPython's espressif_esp32s3_devkitc_1_n8 board definition.
+# The RGB LED is GPIO48 on DevKitC-1 v1.0 and GPIO38 on v1.1; change NEOPIXEL for v1.1.
+# CircuitPython names no I2C/SPI pins here; SDA/SCL/SPI are Arduino-ESP32's defaults.
+# IO35-37 are taken by PSRAM on octal-PSRAM modules (N8R8, N16R8).
+[board]
+name    = "esp32s3_devkitc"
+chip    = "esp32s3"
+title   = "Espressif ESP32-S3-DevKitC-1 N8"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+radio   = "wifi ble"
+[pins]
+NEOPIXEL       = 48
+BUTTON         = 0
+IO0            = 0
+IO1            = 1
+IO2            = 2
+IO3            = 3
+IO4            = 4
+IO5            = 5
+IO6            = 6
+IO7            = 7
+IO8            = 8
+IO9            = 9
+IO10           = 10
+IO11           = 11
+IO12           = 12
+IO13           = 13
+IO14           = 14
+IO15           = 15
+IO16           = 16
+IO17           = 17
+IO18           = 18
+IO19           = 19
+IO20           = 20
+IO21           = 21
+IO35           = 35
+IO36           = 36
+IO37           = 37
+IO38           = 38
+IO39           = 39
+IO40           = 40
+IO41           = 41
+IO42           = 42
+IO43           = 43
+IO44           = 44
+IO45           = 45
+IO46           = 46
+IO47           = 47
+IO48           = 48
+SDA            = 8
+SCL            = 9
+MOSI           = 11
+MISO           = 13
+SCK            = 12
+TX             = 43
+RX             = 44
+[indicators]
+NEOPIXEL       = "neopixel"
+BUTTON         = "button active_low"

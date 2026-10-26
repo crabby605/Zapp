@@ -1,0 +1,12 @@
+# 2MB quad PSRAM, 4MB quad flash — from CircuitPython's
+# ports/espressif/boards/adafruit_qtpy_esp32s3_4mbflash_2mbpsram/mpconfigboard.mk
+# ports/espressif/boards/adafruit_qtpy_esp32s3_nopsram/mpconfigboard.mk
+# Also runs on the no-PSRAM QT Py (8MB flash): Zapp then keeps the small sizes.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+# Start anyway if the chip isn't there.
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+# Only memory Zapp asks for as PSRAM goes there (the drive and the store).
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y

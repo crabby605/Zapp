@@ -1,0 +1,51 @@
+# Pin map from CircuitPython's waveshare_esp32_s3_zero board definition.
+# CircuitPython names no I2C or SPI pins, so say them in a config block.
+[board]
+name    = "esp32s3_zero"
+chip    = "esp32s3"
+title   = "Waveshare ESP32-S3-Zero"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+radio   = "wifi ble"
+[pins]
+NEOPIXEL       = 21
+BUTTON         = 0
+IO0            = 0
+IO1            = 1
+IO2            = 2
+IO3            = 3
+IO4            = 4
+IO5            = 5
+IO6            = 6
+IO7            = 7
+IO8            = 8
+IO9            = 9
+IO10           = 10
+IO11           = 11
+IO12           = 12
+IO13           = 13
+IO14           = 14
+IO15           = 15
+IO16           = 16
+IO17           = 17
+IO18           = 18
+IO33           = 33
+IO34           = 34
+IO35           = 35
+IO36           = 36
+IO37           = 37
+IO38           = 38
+IO39           = 39
+IO40           = 40
+IO41           = 41
+IO42           = 42
+IO43           = 43
+IO44           = 44
+IO45           = 45
+IO46           = 46
+IO47           = 47
+IO48           = 48
+TX             = 43
+RX             = 44
+[indicators]
+NEOPIXEL       = "neopixel"
+BUTTON         = "button active_low"

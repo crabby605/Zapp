@@ -13,15 +13,18 @@ export interface BoardDefinition {
     chip: string;
     title: string;
     install: string;       // how to put this board into install (UF2 bootloader) mode
+    radio: string;         // "wifi ble" on boards with a radio, "" otherwise
     pins: Record<string, number>;
     indicators: Record<string, Indicator>;
+    reserved: Record<number, string>;   // GPIOs a program shouldn't touch, and why
 }
 
-// [board]  name/chip/title
+// [board]  name/chip/title/install/radio
 // [pins]   NAME = gpio
 // [indicators]  NAME = "kind [active_low] [power=gpio]"   (NAME must be in [pins])
+// [reserved]    gpio = "why"   — the IDE warns when a program uses it
 export function parseBoardFile(text: string): BoardDefinition {
-    const board: BoardDefinition = { name: '', chip: 'unknown', title: '', install: '', pins: {}, indicators: {} };
+    const board: BoardDefinition = { name: '', chip: 'unknown', title: '', install: '', radio: '', pins: {}, indicators: {}, reserved: {} };
     let section = '';
 
     for (const raw of text.split(/\r?\n/)) {
@@ -34,11 +37,14 @@ export function parseBoardFile(text: string): BoardDefinition {
         const key = line.slice(0, eq).trim();
         const value = line.slice(eq + 1).trim().replace(/^"|"$/g, '');
 
-        if (section === 'board' && (key === 'name' || key === 'chip' || key === 'title' || key === 'install')) {
+        if (section === 'board' && (key === 'name' || key === 'chip' || key === 'title' || key === 'install' || key === 'radio')) {
             board[key] = value;
         } else if (section === 'pins') {
             if (!/^\d+$/.test(value)) throw new Error(`Pin ${key} must be a GPIO number, got '${value}'`);
             board.pins[key] = Number(value);
+        } else if (section === 'reserved') {
+            if (!/^\d+$/.test(key)) throw new Error(`Reserved pin must be a GPIO number, got '${key}'`);
+            board.reserved[Number(key)] = value;
         } else if (section === 'indicators') {
             const [kind = 'led', ...flags] = value.split(/\s+/);
             const power = flags.find(f => f.startsWith('power='))?.slice('power='.length);

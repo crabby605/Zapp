@@ -63,3 +63,35 @@ export const IconWarn = ({ size }: Props) => svg(
     <><path d="M8 2.5 14 13H2z" /><path d="M8 6.5v3" /><circle cx="8" cy="11.2" r="0.6" fill="currentColor" stroke="none" /></>, size);
 export const IconCheck = ({ size }: Props) => svg(<><path d="M3.5 8.5 6.5 11.5 12.5 4.5" /></>, size);
 export const IconPencil = ({ size }: Props) => svg(<><path d="M10.5 2.5l3 3-8 8H2.5v-3z" /></>, size);
+export const IconBook = ({ size }: Props) => svg(
+    <><path d="M2.5 3.5c2-.8 3.8-.8 5.5.5 1.7-1.3 3.5-1.3 5.5-.5v9c-2-.8-3.8-.8-5.5.5-1.7-1.3-3.5-1.3-5.5-.5z" /><path d="M8 4v9" /></>, size);
+export const IconPackage = ({ size }: Props) => svg(
+    <><path d="M8 2 13.5 5v6L8 14 2.5 11V5z" /><path d="M2.5 5 8 8l5.5-3M8 8v6" /></>, size);
+export const IconFolder = ({ size }: Props) => svg(
+    <><path d="M2 4.5a1 1 0 0 1 1-1h3.3l1.4 1.6H13a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /></>, size);
+export const IconFolderPlus = ({ size }: Props) => svg(
+    <><path d="M2 4.5a1 1 0 0 1 1-1h3.3l1.4 1.6H13a1 1 0 0 1 1 1v6.4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" /><path d="M8 7.5v4M6 9.5h4" /></>, size);
+export const IconFile = ({ size }: Props) => svg(
+    <><path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z" /><path d="M9 2v3h3" /></>, size);
+export const IconFilePlus = ({ size }: Props) => svg(
+    <><path d="M4 2h5l3 3v8.5a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5z" /><path d="M9 2v3h3M8 7.5v4M6 9.5h4" /></>, size);
+export const IconCollapse = ({ size }: Props) => svg(<><path d="M4.5 6.5 8 3l3.5 3.5M4.5 13 8 9.5l3.5 3.5" /></>, size);
+export const IconTarget = ({ size }: Props) => svg(
+    <><circle cx="8" cy="8" r="5" /><circle cx="8" cy="8" r="1.6" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2" /></>, size);
+
+// File icon by type, coloured the way JetBrains does: programs, web files, data, notes.
+const FILE_KINDS: Record<string, { cls: string; label: string }> = {
+    zap: { cls: 'fi-zap', label: 'Z' }, html: { cls: 'fi-html', label: '<>' }, htm: { cls: 'fi-html', label: '<>' },
+    css: { cls: 'fi-css', label: '#' }, js: { cls: 'fi-js', label: 'JS' }, json: { cls: 'fi-json', label: '{}' },
+    svg: { cls: 'fi-svg', label: '◇' }, md: { cls: 'fi-md', label: 'M' }, txt: { cls: 'fi-txt', label: '≡' },
+    csv: { cls: 'fi-txt', label: ',' }, zappmod: { cls: 'fi-json', label: 'm' },
+};
+
+export const FileIcon = ({ name, size = 14 }: { name: string; size?: number }) => {
+    const kind = FILE_KINDS[name.split('.').pop()?.toLowerCase() ?? ''] ?? { cls: 'fi-txt', label: '' };
+    return <span className={`file-icon ${kind.cls}`} style={{ width: size, height: size, fontSize: size * 0.52 }} aria-hidden="true">{kind.label}</span>;
+};
+export const IconError = ({ size }: Props) => svg(
+    <><circle cx="8" cy="8" r="6" /><path d="M6 6l4 4M10 6l-4 4" /></>, size);
+export const IconSplit = ({ size }: Props) => svg(
+    <><rect x="2" y="3" width="12" height="10" rx="1.5" /><path d="M8 3v10" /></>, size);

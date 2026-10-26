@@ -16,7 +16,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { SerialPort } from 'serialport';
 import { z } from 'zod';
 
-import { compileSourceToPayload, findZappPorts, identityBoard, parseBoardFile, parseIdentity, ZAPP_PROBE, type BoardDefinition } from '../compiler/src/index';
+import { compileSourceToPayload, compileWithWarnings, findZappPorts, identityBoard, parseBoardFile, parseIdentity, ZAPP_PROBE, type BoardDefinition } from '../compiler/src/index';
 import { copyUf2, firmwarePath, waitForUf2Drive } from '../compiler/src/nodeInstall';
 import { parseModuleFile } from '../compiler/src/modfile';
 import { onSerialData } from '../compiler/src/nodeSerial';
@@ -73,6 +73,9 @@ const useBoard = (name?: string) => {
     boardName = name;
 };
 const compile = (source: string) => compileSourceToPayload(source, modules, boards[boardName]);
+// What compiles but behaves differently on this board (compiler/src/quirks.ts).
+const boardNotes = (source: string) => compileWithWarnings(source, modules, boards[boardName]).warnings
+    .map((w) => `Board note, line ${w.line}: ${w.message}`);
 const boardParam = z.string().optional()
     .describe(`Board profile, remembered for later calls: ${Object.keys(boards).join(', ')}`);
 
@@ -236,7 +239,7 @@ async function emulate(source: string, gpio: string[] = [], display?: string): P
 
     const args = gpio.flatMap((preset) => ['--gpio', preset]);
     if (display) args.push('--display', display);
-    if (boardName !== 'pico_w') args.push('--no-radio');
+    if (!boards[boardName]?.radio) args.push('--no-radio');
     const { stdout, stderr } = await run(binary, [...args, '--quiet', compile(source)],
                                          { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 });
     return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
@@ -293,7 +296,7 @@ server.registerTool('zapp_run', {
     const payload = compile(source).replace(/^BC:/, 'RUN:');
     const reply = await board.command(payload, 10_000);
     const output = await board.drain(600);
-    return text([`Running ${(payload.length - 4) / 2} bytes.`, reply, output].filter(Boolean).join('\n'));
+    return text([`Running ${(payload.length - 4) / 2} bytes.`, ...boardNotes(source), reply, output].filter(Boolean).join('\n'));
 });
 
 server.registerTool('zapp_save', {
@@ -304,7 +307,7 @@ server.registerTool('zapp_save', {
     const payload = compile(source);
     const reply = await board.command(payload, 10_000);
     const output = await board.drain(600);
-    return text([`Saved ${(payload.length - 3) / 2} bytes as the power-up program.`, reply, output].filter(Boolean).join('\n'));
+    return text([`Saved ${(payload.length - 3) / 2} bytes as the power-up program.`, ...boardNotes(source), reply, output].filter(Boolean).join('\n'));
 });
 
 server.registerTool('zapp_install', {
@@ -351,7 +354,7 @@ server.registerTool('zapp_emulate', {
     },
 }, async ({ source, gpio, display, board: name }) => {
     useBoard(name);
-    return text(await emulate(source, gpio ?? [], display));
+    return text([...boardNotes(source), await emulate(source, gpio ?? [], display)].join('\n'));
 });
 
 server.registerTool('zapp_compile', {
@@ -360,20 +363,20 @@ server.registerTool('zapp_compile', {
 }, async ({ source, board: name }) => {
     useBoard(name);
     const payload = compile(source);
-    return text(`${payload}\n(${(payload.length - 3) / 2} bytes)`);
+    return text([payload, `(${(payload.length - 3) / 2} bytes)`, ...boardNotes(source)].join('\n'));
 });
 
 server.registerTool('zapp_gpio_write', {
     description: 'Set one GPIO pin high or low on the connected board.',
     inputSchema: {
-        pin: z.number().int().min(0).max(29),
+        pin: z.number().int().min(0).max(48),   // the board checks its own range
         value: z.enum(['high', 'low']),
     },
 }, async ({ pin, value }) => text(await board.command(`set pin ${pin} ${value}`)));
 
 server.registerTool('zapp_gpio_read', {
     description: 'Read one GPIO pin on the connected board.',
-    inputSchema: { pin: z.number().int().min(0).max(29) },
+    inputSchema: { pin: z.number().int().min(0).max(48) },
 }, async ({ pin }) => text(await board.command(`read pin ${pin}`)));
 
 server.registerTool('zapp_i2c_scan', {

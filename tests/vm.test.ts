@@ -1,4 +1,4 @@
-// End-to-end tests: Zapp source → bytecode → the real VM (src/vm.c) running in
+// End-to-end tests: Zapp source → bytecode → the real VM (firmware/core/vm.c) running in
 // the emulator. If these pass, the compiler and the firmware agree.
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
@@ -263,9 +263,18 @@ describe('modules', () => {
         expect(date).toMatch(/^\d{2}\/\d{2}\/20\d{2}$/);
     });
 
-    test('virtual bmp280 reads a room temperature', () => {
-        const src = 'config:\n    i2c sda=20 scl=21\n\nuse bmp280\n\nget data from bmp280\nprint bmp280.temp\n';
-        expect(Number(run(src)[0])).toBeCloseTo(21, 0);
+    test('bmp280 matches the datasheet example: 25.08 C, 1006.53 hPa', () => {
+        const src = 'config:\n    i2c sda=20 scl=21\n\nuse bmp280\n\nget data from bmp280\nprint bmp280.temp\nprint bmp280.pressure\n';
+        const [temp, pressure] = run(src).map(Number);
+        expect(temp).toBeCloseTo(25.08, 2);
+        expect(pressure).toBeCloseTo(1006.53, 1);
+    });
+
+    test('an older bmp280 module (3-byte pressure) still reads right', () => {
+        const old = parseModuleFile(fs.readFileSync(path.join(root, 'modules', 'bmp280.zappmod'), 'utf8')
+            .replace('len       = 6', 'len       = 3'));
+        const hex = compileSourceToPayload('config:\n    i2c sda=20 scl=21\nuse bmp280\nget data from bmp280\nprint bmp280.pressure\n', { bmp280: old });
+        expect(Number(execFileSync(emulator, ['--quiet', hex], { encoding: 'utf8' }).trim())).toBeCloseTo(1006.53, 1);
     });
 
     test('virtual mpu6050 reads a board lying flat', () => {
@@ -573,3 +582,43 @@ describe('function calls with brackets', () => {
         expect(run('func add a b:\n    print a + b\nadd(2, 3)\nadd 2 3\n')).toEqual(['5', '5']);
     });
 });
+
+// Your own module: fields described by format/shift/bits/scale/offset compile to
+// plain VM steps. The emulator's unknown I2C device answers bytes 1, 2, 3...
+describe('modules described by registers', () => {
+    const mod = (fields: string) => parseModuleFile(
+        '[module]\nname = "probe"\n[compat]\ninterface = "i2c"\n[i2c]\naddr_default = 0x50\n' + fields);
+    const read = (fields: string, field = 'v') => {
+        const hex = compileSourceToPayload(`use probe\nget data from probe\nprint probe.${field}\n`, { probe: mod(fields) }, pico);
+        return execFileSync(emulator, ['--quiet', hex], { encoding: 'utf8' }).trim();
+    };
+
+    test('format picks byte order and sign', () => {
+        expect(read('[fields.v]\nreg = 0\nformat = "u16_be"\n')).toBe('258');     // 0x0102
+        expect(read('[fields.v]\nreg = 0\nformat = "u16_le"\n')).toBe('513');     // 0x0201
+        expect(read('[fields.v]\nreg = 0\nformat = "u24_be"\n')).toBe('66051');   // 0x010203
+    });
+
+    test('shift, bits, scale and offset apply in order', () => {
+        expect(read('[fields.v]\nreg = 0\nformat = "u16_be"\nshift = 4\n')).toBe('16');
+        expect(read('[fields.v]\nreg = 0\nformat = "u16_be"\nbits = 4\n')).toBe('2');
+        expect(read('[fields.v]\nreg = 0\nformat = "u16_be"\nshift = 4\nscale = 0.5\noffset = -40\n')).toBe('-32');
+    });
+
+    test('a signed field narrower than its bytes keeps its sign', () => {
+        expect(read('[fields.v]\nreg = 0\nformat = "i16_le"\nbits = 10\n')).toBe('-511');   // 0x201 in 10 bits
+    });
+
+    test('bool fields are true when any kept bit is set', () => {
+        expect(read('[fields.v]\ntype = "bool"\nreg = 0\nformat = "u8"\nmask = 0x01\n')).toBe('true');
+        expect(read('[fields.v]\ntype = "bool"\nreg = 0\nformat = "u8"\nmask = 0x02\n')).toBe('false');
+    });
+
+    test('mistakes are explained', () => {
+        expect(() => mod('[fields.v]\nreg = 0\nformat = "u17"\n')).toThrow(/isn't one Zapp knows/);
+        expect(() => mod('[fields.v]\nreg = 0\n')).toThrow(/needs a format/);
+        expect(() => mod('[fields.v]\nreg = 0\nformat = "u16_be"\ntransform = "raw_u8"\n')).toThrow(/use one/);
+        expect(() => mod('[fields.v]\nreg = 0\nformat = "u16_be"\nlen = 1\n')).toThrow(/needs 2 bytes/);
+    });
+});
+

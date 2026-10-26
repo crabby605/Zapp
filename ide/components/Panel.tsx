@@ -112,12 +112,11 @@ export function Lights({ board, result, pressed, onPress }: {
                 if (ind.kind === 'button') {
                     const down = pressed.has(name);
                     return (
-                        <button key={name} className={`light button ${down ? 'down' : ''}`}
+                        <button key={name} className={`light button ${down ? 'down' : ''}`} aria-pressed={down}
                                 onClick={() => onPress(name)}
-                                title="Click to hold this button pressed in the simulator">
+                                title={down ? 'Held down — click to let go' : 'Click to hold it down'}>
                             <span className="dot" />
                             <span className="label">{name}</span>
-                            <span className="sub">{down ? 'held' : 'click to press'}</span>
                         </button>
                     );
                 }
@@ -126,20 +125,18 @@ export function Lights({ board, result, pressed, onPress }: {
                     const on = px && (px.r || px.g || px.b) && px.brightness > 0;
                     const color = px ? `rgb(${px.r}, ${px.g}, ${px.b})` : undefined;
                     return (
-                        <div key={name} className={`light ${on ? 'on' : ''}`}>
-                            <span className="dot" style={on ? { background: color, boxShadow: `0 0 14px ${color}`, opacity: 0.35 + 0.65 * (px!.brightness / 255) } : undefined} />
+                        <div key={name} className={`light pixel ${on ? 'on' : ''}`} title={on ? `${name}: ${px!.r} ${px!.g} ${px!.b}` : `${name}: off`}>
+                            <span className="dot" style={on ? { background: color, boxShadow: `0 0 16px 2px ${color}`, opacity: 0.35 + 0.65 * (px!.brightness / 255) } : undefined} />
                             <span className="label">{name}</span>
-                            <span className="sub">{on ? `${px!.r} ${px!.g} ${px!.b}` : 'off'}</span>
                         </div>
                     );
                 }
                 const level = result?.pinStates[pin];
                 const lit = level === undefined ? false : ind.activeLow ? !level : level;
                 return (
-                    <div key={name} className={`light led ${lit ? 'on' : ''} ${ledColor(name)}`}>
+                    <div key={name} className={`light led ${lit ? 'on' : ''} ${ledColor(name)}`} title={`${name}: ${lit ? 'on' : 'off'}`}>
                         <span className="dot" />
                         <span className="label">{name}</span>
-                        <span className="sub">{lit ? 'on' : 'off'}</span>
                     </div>
                 );
             })}
@@ -185,7 +182,7 @@ export function PinsUsed({ board, result }: { board: BoardDefinition | undefined
         .sort((a, b) => a[0] - b[0]), [result]);
     if (!pins.length) return null;
     return (
-        <div className="pins">
+        <div className="pins" aria-label="Pins the program used">
             {pins.map(([pin, high]) => (
                 <span key={pin} className={`pin ${high ? 'high' : ''}`}>
                     {pinLabel(board, pin)} <b>{high ? 'HIGH' : 'LOW'}</b>

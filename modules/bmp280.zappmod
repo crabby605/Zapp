@@ -1,7 +1,7 @@
 [module]
 name        = "bmp280"
-version     = "1.0.0"
-description = "Bosch BMP280 temperature and pressure sensor"
+version     = "1.1.0"
+description = "Bosch BMP280 temperature (C) and pressure (hPa) sensor"
 author      = "zapp-lang"
 [compat]
 min_flash_kb = 4
@@ -21,8 +21,9 @@ type      = "num"
 reg       = 0xFA
 len       = 3
 transform = "bmp280_temp"
+# Pressure reads temperature too (0xF7-0xFC): its formula depends on it.
 [fields.pressure]
 type      = "num"
 reg       = 0xF7
-len       = 3
+len       = 6
 transform = "bmp280_pressure"

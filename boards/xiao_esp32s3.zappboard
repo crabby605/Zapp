@@ -1,29 +1,36 @@
+# Pin map from CircuitPython's seeed_xiao_esp32_s3_sense board definition (D0-D10 are the plain XIAO's).
+# The user LED on GPIO21 lights when driven low.
 [board]
 name    = "xiao_esp32s3"
 chip    = "esp32s3"
+title   = "Seeed XIAO ESP32S3"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+radio   = "wifi ble"
 [pins]
-LED      = 21
-A0       = 1
-A1       = 2
-A2       = 3
-A3       = 4
-A4       = 5
-A5       = 6
-D0       = 1
-D1       = 2
-D2       = 3
-D3       = 4
-D4       = 5
-D5       = 6
-D6       = 43
-D7       = 44
-D8       = 7
-D9       = 8
-D10      = 9
-SDA      = 5
-SCL      = 6
-MOSI     = 9
-MISO     = 8
-SCK      = 7
-TX       = 43
-RX       = 44
+LED            = 21
+A0             = 1
+A1             = 2
+A2             = 3
+A3             = 4
+A4             = 5
+A5             = 6
+D0             = 1
+D1             = 2
+D2             = 3
+D3             = 4
+D4             = 5
+D5             = 6
+D6             = 43
+D7             = 44
+D8             = 7
+D9             = 8
+D10            = 9
+SDA            = 5
+SCL            = 6
+MOSI           = 9
+MISO           = 8
+SCK            = 7
+TX             = 43
+RX             = 44
+[indicators]
+LED            = "led active_low"

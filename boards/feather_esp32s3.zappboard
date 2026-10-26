@@ -1,0 +1,39 @@
+# Pin map from CircuitPython's adafruit_feather_esp32s3_4mbflash_2mbpsram board definition.
+# The STEMMA QT port is powered from I2C_POWER: `set pin I2C_POWER high` before using it.
+# A0-A4 are on ADC2, which can't read while Wi-Fi is busy; A5 is on ADC1.
+[board]
+name    = "feather_esp32s3"
+chip    = "esp32s3"
+title   = "Adafruit Feather ESP32-S3"
+install = "Double-tap RESET for the UF2 drive, then drag uf2-app.bin onto it"
+radio   = "wifi ble"
+[pins]
+LED            = 13
+NEOPIXEL       = 33
+NEOPIXEL_POWER = 21
+BUTTON         = 0
+I2C_POWER      = 7
+A0             = 18
+A1             = 17
+A2             = 16
+A3             = 15
+A4             = 14
+A5             = 8
+D5             = 5
+D6             = 6
+D9             = 9
+D10            = 10
+D11            = 11
+D12            = 12
+D13            = 13
+SDA            = 3
+SCL            = 4
+MOSI           = 35
+MISO           = 37
+SCK            = 36
+TX             = 39
+RX             = 38
+[indicators]
+LED            = "led"
+NEOPIXEL       = "neopixel power=21"
+BUTTON         = "button active_low"

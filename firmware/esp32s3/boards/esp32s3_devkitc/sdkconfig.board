@@ -1,0 +1,3 @@
+# no PSRAM, 8MB quad flash — from CircuitPython's
+# ports/espressif/boards/espressif_esp32s3_devkitc_1_n8/mpconfigboard.mk
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y

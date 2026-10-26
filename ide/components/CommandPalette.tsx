@@ -10,7 +10,7 @@ export interface Command {
     run: () => void;
 }
 
-// Subsequence match, the way every palette works: "rem" finds "Run in emulator".
+// Subsequence match, the way every palette works: "rsim" finds "Run in the simulator".
 function score(query: string, text: string): number | null {
     if (!query) return 0;
     const q = query.toLowerCase();
@@ -62,7 +62,7 @@ export function CommandPalette({ commands, onClose }: {
             <div className="palette" onMouseDown={(e) => e.stopPropagation()}>
                 <input ref={inputRef} value={query} onKeyDown={onKeyDown}
                        onChange={(e) => setQuery(e.target.value)}
-                       placeholder="Run a command or open a file…" />
+                       placeholder="Search files and commands" />
                 <ul>
                     {matches.map((command, i) => (
                         <li key={command.id}

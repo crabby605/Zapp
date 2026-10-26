@@ -1,4 +1,4 @@
-// Zapp emulator — the real bytecode VM (src/vm.c) linked against a virtual
+// Zapp emulator — the real bytecode VM (firmware/core/vm.c) linked against a virtual
 // board instead of the Pico SDK. Every hardware effect prints as one line, so
 // programs can be tested on a laptop with no board attached.
 //
@@ -119,7 +119,7 @@ static void budget_check(void) {
     }
 }
 
-void hal_init(void) {}
+void hal_board_init(void) {}
 
 // GPIO
 void hal_gpio_set_output(uint8_t pin) { (void)pin; }
@@ -226,14 +226,21 @@ static bool mpu6050_read(uint8_t reg, uint8_t *buf, size_t len) {
     return true;
 }
 
-// BMP280 (0x76/0x77): 20-bit raw samples that decode to ~21 C via the VM's
-// simplified compensation.
+// BMP280 (0x76/0x77): the datasheet's worked example (BMP280 datasheet §8.2):
+// its calibration at 0x88-0x9F, and raw samples that compensate to 25.08 C and
+// 100653 Pa.
 static bool bmp280_read(uint8_t reg, uint8_t *buf, size_t len) {
-    uint32_t adc = (reg == 0xFA) ? 671744u : 983040u;   // temp : pressure
-    if (len > 0) buf[0] = (uint8_t)(adc >> 12);
-    if (len > 1) buf[1] = (uint8_t)((adc >> 4) & 0xFF);
-    if (len > 2) buf[2] = (uint8_t)((adc << 4) & 0xF0);
-    for (size_t i = 3; i < len; i++) buf[i] = 0;
+    static const int32_t calib[12] = { 27504, 26435, -1000, 36477, -10685, 3024,
+                                       2855, 140, -7, 15500, -14600, 6000 };
+    uint8_t regs[256] = { 0 };
+    for (int i = 0; i < 12; i++) {
+        regs[0x88 + 2 * i]     = (uint8_t)(calib[i] & 0xFF);
+        regs[0x88 + 2 * i + 1] = (uint8_t)((calib[i] >> 8) & 0xFF);
+    }
+    const uint32_t adc_p = 415148, adc_t = 519888;
+    regs[0xF7] = (uint8_t)(adc_p >> 12); regs[0xF8] = (uint8_t)(adc_p >> 4); regs[0xF9] = (uint8_t)(adc_p << 4);
+    regs[0xFA] = (uint8_t)(adc_t >> 12); regs[0xFB] = (uint8_t)(adc_t >> 4); regs[0xFC] = (uint8_t)(adc_t << 4);
+    for (size_t i = 0; i < len; i++) buf[i] = regs[(reg + i) & 0xFF];
     return true;
 }
 

@@ -1,0 +1,7 @@
+# Fits the 4MB modules. "zapp" holds main.zap, its bytecode, modules/ and web/;
+# boards with PSRAM use up to 512KB of it, others 32KB.
+# Name,   Type, SubType, Offset,   Size
+nvs,      data, nvs,     0x9000,   0x6000
+phy_init, data, phy,     0xf000,   0x1000
+factory,  app,  factory, 0x10000,  0x200000
+zapp,     data, 0x40,    0x210000, 0x100000

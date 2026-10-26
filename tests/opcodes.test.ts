@@ -1,4 +1,4 @@
-// The opcode numbers live in two places: include/vm.h (firmware) and
+// The opcode numbers live in two places: firmware/core/vm.h (firmware) and
 // compiler/src/opcodes.ts (compiler). These tests parse the C headers so the
 // two can never drift apart silently.
 import * as fs from 'fs';
@@ -6,8 +6,8 @@ import * as path from 'path';
 import { OP, TRANSFORM_IDS, PARSER_IDS } from '../compiler/src/opcodes';
 
 const root = path.join(__dirname, '..');
-const vmHeader = fs.readFileSync(path.join(root, 'include', 'vm.h'), 'utf8');
-const vmSource = fs.readFileSync(path.join(root, 'src', 'vm.c'), 'utf8');
+const vmHeader = fs.readFileSync(path.join(root, 'firmware', 'core', 'vm.h'), 'utf8');
+const vmSource = fs.readFileSync(path.join(root, 'firmware', 'core', 'vm.c'), 'utf8');
 
 // OP_GPIO_WRITE = 0x01, ...
 function parseOpcodes(source: string): Record<string, number> {

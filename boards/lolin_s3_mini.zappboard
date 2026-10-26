@@ -1,0 +1,49 @@
+# Pin map from CircuitPython's lolin_s3_mini board definition.
+[board]
+name    = "lolin_s3_mini"
+chip    = "esp32s3"
+title   = "LOLIN S3 Mini"
+install = "Hold BOOT, tap RESET, then flash with idf.py (see README)"
+radio   = "wifi ble"
+[pins]
+NEOPIXEL       = 47
+BUTTON         = 0
+IO0            = 0
+IO1            = 1
+IO2            = 2
+IO3            = 3
+IO4            = 4
+IO5            = 5
+IO6            = 6
+IO7            = 7
+IO8            = 8
+IO9            = 9
+IO10           = 10
+IO11           = 11
+IO12           = 12
+IO13           = 13
+IO14           = 14
+IO15           = 15
+IO16           = 16
+IO17           = 17
+IO18           = 18
+IO21           = 21
+IO33           = 33
+IO34           = 34
+IO35           = 35
+IO36           = 36
+IO37           = 37
+IO38           = 38
+IO43           = 43
+IO44           = 44
+IO47           = 47
+SDA            = 35
+SCL            = 36
+MOSI           = 11
+MISO           = 13
+SCK            = 12
+TX             = 43
+RX             = 44
+[indicators]
+NEOPIXEL       = "neopixel"
+BUTTON         = "button active_low"

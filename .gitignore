@@ -7,3 +7,7 @@ cmake-build-*/
 emulator/zapp-emu
 .DS_Store
 .idea/
+firmware/esp32s3/managed_components/
+firmware/esp32s3/sdkconfig
+firmware/esp32s3/sdkconfig.old
+.cache/

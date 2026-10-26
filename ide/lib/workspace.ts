@@ -2,16 +2,43 @@
 // model the editor works against.
 
 export interface FileEntry {
-    path: string;        // "workspace/main.zap"
+    path: string;        // "workspace/web/index.html"
     name: string;
+    kind: 'file' | 'dir';
     size: number;
     modified: number;
+    writable?: boolean;
+    children?: FileEntry[];
+}
+
+/** A plugged-in board's own USB drive. */
+export interface DriveInfo {
+    name: string;
+    tree: FileEntry[];
+    hasWeb: boolean;      // older firmware has no web/ folder
+    slotsUsed: number;    // files in modules/ + web/
+    slots: number;
+    bytesUsed: number;
+    bytes: number | null; // space modules/ + web/ share; null on older firmware (2KB each)
 }
 
 export interface FileTree {
-    workspace: FileEntry[];
-    examples: FileEntry[];
-    modules: FileEntry[];
+    workspace: FileEntry[];   // nested folders
+    examples: FileEntry[];    // flat, read-only
+    drive: DriveInfo | null;
+}
+
+/** Every file in a tree, depth-first. */
+export const allFiles = (nodes: FileEntry[]): FileEntry[] =>
+    nodes.flatMap((n) => (n.kind === 'dir' ? allFiles(n.children ?? []) : [n]));
+
+export const parentOf = (path: string) => path.split('/').slice(0, -1).join('/');
+
+// Monaco language for a file, by extension.
+export function languageOf(path: string): string {
+    const ext = path.split('.').pop()?.toLowerCase();
+    return ({ zap: 'zapp', zappmod: 'ini', html: 'html', htm: 'html', css: 'css', js: 'javascript',
+              json: 'json', svg: 'xml', md: 'markdown' } as Record<string, string>)[ext ?? ''] ?? 'plaintext';
 }
 
 export interface Buffer {
@@ -52,11 +79,16 @@ const post = (body: object) =>
         body: JSON.stringify(body),
     });
 
-export const createFile = (name: string, content = '') => post({ op: 'create', name, content });
+/** `dir` is a workspace folder path ("workspace" or "workspace/web"). */
+export const createFile = (dir: string, name: string, content = '') => post({ op: 'create', dir, name, content });
+export const createFolder = (dir: string, name: string) => post({ op: 'mkdir', dir, name });
+export const moveEntry = (path: string, to: string) => post({ op: 'move', path, to });
+/** Copy a file between My programs and the board drive. `to` is a folder; "drive" itself means main.zap. */
+export const copyEntry = (path: string, to: string) => post({ op: 'copy', path, to });
 
 /** Copy a read-only example into the workspace so editing it is safe. */
 export const copyToWorkspace = (from: string) =>
-    post({ op: 'create', name: fileName(from), from });
+    post({ op: 'create', dir: 'workspace', name: fileName(from), from });
 
 export const renameFile = (path: string, name: string) => post({ op: 'rename', path, name });
 export const deleteFile = (path: string) => post({ op: 'delete', path });
@@ -88,4 +120,25 @@ export function saveSession(session: Session) {
     } catch {
         // private mode: losing the tab list is survivable
     }
+}
+
+// Drafts: unsaved edits, kept per file so a refresh or a crash loses nothing.
+// They come back still marked unsaved.
+
+const DRAFTS_KEY = 'zapp-ide-drafts';
+
+export function loadDrafts(): Record<string, string> {
+    try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? '{}'); } catch { return {}; }
+}
+
+export function saveDrafts(buffers: Record<string, Buffer>) {
+    const drafts = Object.fromEntries(Object.values(buffers)
+        .filter((b) => b.writable && isDirty(b)).map((b) => [b.path, b.content]));
+    try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch { /* full or unavailable */ }
+}
+
+/** A buffer for a file just read from disk, with its draft applied if it has one. */
+export function bufferFor(path: string, file: { content: string; writable: boolean }): Buffer {
+    const draft = file.writable ? loadDrafts()[path] : undefined;
+    return { path, content: draft ?? file.content, saved: file.content, writable: file.writable };
 }

@@ -1,4 +1,4 @@
-# Welcome to Zapp.
+# Welcome to Zapp!
 # Run this with the Run button or Cmd/Ctrl+Enter — no board required.
 
 num count = 0
@@ -10,3 +10,5 @@ repeat 3:
     sleep 200ms
     set pin 25 low
     sleep 200ms
+connect wifi to "network" with "password"
+  

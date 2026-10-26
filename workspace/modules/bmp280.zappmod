@@ -1,0 +1,28 @@
+[module]
+name        = "bmp280"
+version     = "1.0.0"
+description = "Bosch BMP280 temperature and pressure sensor"
+author      = "zapp-lang"
+[compat]
+min_flash_kb = 4
+min_ram_kb   = 2
+targets      = ["all"]
+interface    = "i2c"
+[i2c]
+addr_default = 0x76
+addr_alt     = 0x77
+[init]
+0xF3 = 0x00
+0xF4 = 0xB7
+0xF5 = 0xB0
+[fields]
+[fields.temp]
+type      = "num"
+reg       = 0xFA
+len       = 3
+transform = "bmp280_temp"
+[fields.pressure]
+type      = "num"
+reg       = 0xF7
+len       = 3
+transform = "bmp280_pressure"

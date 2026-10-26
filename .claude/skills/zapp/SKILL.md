@@ -136,22 +136,23 @@ set brightness on pin 16 to 64
 show pixels on pin 16
 ```
 
-### Wi-Fi — Pico W only
+### Wi-Fi — Pico W and ESP32-S3
 
 ```zap
-config:
-    wifi ssid="network" password="secret"
-
-connect wifi
+connect wifi to "network" with "secret"     # leave out `with` for an open network
 if wifi connected:
     print "ip " + wifi ip
     text page = http get "http://example.com/api"
+
+start wifi "Zapp" with "secret123"          # or be the network
+serve web                                   # serves web/index.html from the drive
 ```
 
-Needs the radio firmware (`cmake .. -DZAPP_BOARD=pico_w`). Plain RP2040 boards
-stop with `Hardware Error: this board has no radio`; the emulator reproduces
-that with `--no-radio`. GET over plain `http://` only, responses truncated to 63
-bytes, one request at a time.
+The Pico W needs the radio build (`-DZAPP_BOARD=pico_w`); every ESP32-S3 build
+has the radio. Boards without one stop with `Hardware Error: this board has no
+radio`; the emulator reproduces that with `--no-radio`. Responses are truncated
+to 63 bytes, one request at a time. The Pico W does GET over `http://` only; the
+ESP32-S3 also does POST and `https://`.
 
 ### Bluetooth LE — Pico W only
 
@@ -185,15 +186,18 @@ only (the board can't scan for or connect to other devices).
   Bit operators truncate decimals to whole numbers first.
 - Pins in `set pin` / `pulse` / `move servo` are literals unless the value comes
   from a variable or parameter (the compiler emits a stack pin for that).
-- Servo trim lives in `SERVO_MIN_US`/`SERVO_MAX_US` in `src/hal_rp2040.c` — real
+- Servo trim lives in `SERVO_MIN_US`/`SERVO_MAX_US` in each port's HAL
+  (`firmware/rp2040/hal_rp2040.c`, `firmware/esp32s3/main/hal_esp32.c`) — real
   servos need it.
 
 ## Where things live
 
 ```
 compiler/src/    lexer.ts, emitter.ts (parser + codegen), opcodes.ts, modfile.ts
-src/             firmware: vm.c (the VM), hal_rp2040.c, hal_radio_*.c, main.c, usb_*.c
-include/vm.h     the opcode table — the contract between compiler and firmware
+firmware/core/   shared firmware: vm.c (the VM), vm.h (the opcode table — the
+                 contract with the compiler), repl.c, usb_*.c, project_store.c
+firmware/rp2040/ Pico SDK port: hal_rp2040.c, CYW43 Wi-Fi/BLE, CMakeLists.txt
+firmware/esp32s3/ ESP-IDF port: main/hal_esp32.c, main/hal_radio_esp32.c
 emulator/        zapp_emu.c: the VM plus a virtual board; `make` builds zapp-emu
 tests/           jest: compiler, opcode-table sync, and end-to-end VM runs
 ide/             Next.js web IDE — `npm run dev`, then localhost:3000
@@ -205,13 +209,21 @@ modules/         .zappmod sensor definitions (declarative, no code)
 
 Write `modules/<name>.zappmod` — `[module]`, `[compat] interface = i2c|uart|spi`,
 the bus section, optional `[init]` register writes, and one `[fields.x]` block
-per reading. If the device needs new maths, add a transform to the `TransformId`
-enum in `src/vm.c` **and** to `TRANSFORM_IDS` in `compiler/src/opcodes.ts` —
-`tests/opcodes.test.ts` fails if the two drift.
+per reading. For I2C, describe each reading with `reg`, `format` (`u8`, `i16_be`,
+`u24_le`…) and optional `shift`, `bits`, `mask`, `scale`, `offset`, `type = "bool"`
+— see the README's module section. Only maths those can't express needs a new
+transform: add it to the `TransformId` enum in `firmware/core/vm.c` **and** to
+`TRANSFORM_IDS` in `compiler/src/opcodes.ts` — `tests/opcodes.test.ts` fails if
+the two drift.
 
 ## Flashing firmware
 
-`cd build && cmake .. && make -j8` → `build/zapp.uf2` (add `-DZAPP_BOARD=pico_w`
-for the Wi-Fi build). Hold BOOTSEL, plug the
-board in, drop the `.uf2` on the drive that appears. The board then mounts as
-`Zapp Drive` with `main.zap` on it; saving that file auto-syncs to flash.
+RP2040: `cd firmware/rp2040 && cmake -B build && make -C build -j8` →
+`build/zapp.uf2` (`-B build-picow -DZAPP_BOARD=pico_w` for the Wi-Fi build).
+To install on an RP2040, hold BOOTSEL, plug the board in, and drop the `.uf2`
+on the drive that appears.
+ESP32-S3: `cd firmware/esp32s3 && idf.py -B build-<board> -D ZAPP_BOARD=<board> build flash`,
+one build per board in `boards/` (hold BOOT and tap RESET
+first if it isn't in download mode).
+Running Zapp, the board mounts its own drive with `main.zap`, `modules/` and
+`web/` on it; saving a file there auto-syncs it to flash.

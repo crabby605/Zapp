@@ -20,13 +20,13 @@ repeat forever:
 
 ```
 .zap source  →  Lexer  →  Parser/Emitter  →  bytecode  →  VM  →  HAL  →  hardware
-                (TypeScript compiler)           (uint8_t[])   (Core 1)   (Pico SDK)
+                (TypeScript compiler)           (uint8_t[])   (Core 1)   (Pico SDK / ESP-IDF)
                                                      │
                                                      └──→  VM  →  virtual board   (emulator, no hardware)
 ```
 
-**Dual-core execution** on RP2040:
-- **Core 0** — USB CDC (serial REPL), TinyUSB, MSC drive, auto-sync
+**Dual-core execution** on RP2040 and ESP32-S3:
+- **Core 0** — USB CDC (serial REPL), TinyUSB, MSC drive, auto-sync (and Wi-Fi/BLE on the S3)
 - **Core 1** — VM execution, HAL dispatch, sensor I/O
 
 **USB composite device:**
@@ -36,18 +36,68 @@ repeat forever:
 
 ## Building
 
-### Firmware (C, Pico SDK)
+### Firmware
+
+One shared core (`firmware/core`: VM, REPL, USB drive, flash store) and one
+folder per chip. A port implements `hal.h`, `hal_radio.h` and `port.h`.
+
+**RP2040 / Pico W** (Pico SDK, pulled in as a submodule):
 
 ```bash
-# Prerequisites: arm-none-eabi-gcc, cmake, pico-sdk
-export PICO_SDK_PATH=/path/to/pico-sdk
-
-mkdir build && cd build
-cmake ..
-make -j8
+git submodule update --init --recursive
+cd firmware/rp2040
+cmake -B build && make -C build -j8                              # plain RP2040
+cmake -B build-picow -DZAPP_BOARD=pico_w && make -C build-picow -j8  # Pico W, Wi-Fi + BLE
 ```
 
 Output: `build/zapp.uf2` — hold BOOTSEL on your Pico, drag the file onto the drive.
+
+**ESP32-S3** (ESP-IDF 5.5, Wi-Fi + BLE built in). One build per board, like
+CircuitPython: `firmware/esp32s3/boards/<board>/sdkconfig.board` sets that
+board's flash size and PSRAM (taken from CircuitPython's `mpconfigboard.mk`),
+and the firmware knows which board it is.
+
+```bash
+. ~/esp/esp-idf/export.sh
+cd firmware/esp32s3
+idf.py -B build-xiao_esp32s3 -D ZAPP_BOARD=xiao_esp32s3 build
+idf.py -B build-xiao_esp32s3 -p /dev/cu.usbmodem* flash   # hold BOOT, tap RESET first if it isn't in download mode
+```
+
+| Board build | PSRAM | Flash |
+|---|---|---|
+| `esp32s3_devkitc` (DevKitC-1 N8) | none | 8MB |
+| `esp32s3_devkitc_n8r8` | 8MB octal | 8MB |
+| `xiao_esp32s3` | 8MB octal | 8MB |
+| `feather_esp32s3`, `qtpy_esp32s3` | 2MB quad (also runs on the no-PSRAM versions) | 4MB |
+| `esp32s3_zero`, `lolin_s3_mini` | 2MB quad | 4MB |
+
+Plain `idf.py build` (no `ZAPP_BOARD`) gives a build for any S3 with no PSRAM.
+Octal and quad PSRAM are wired differently, so a board needs its own build.
+
+TinyUSB comes from Espressif's component registry on the first build. Once Zapp
+is running, the board's native USB port is the Zapp drive and REPL; type
+`bootloader` in the REPL to drop back into download mode for the next flash.
+Boards with Adafruit's TinyUF2 bootloader (Feather / QT Py S3) can take
+`idf.py -B build-<board> uf2-app` → `uf2-app.bin` instead: double-tap reset, drag it on.
+
+**How much a board stores.** `main.zap` gets 8KB; everything in `modules/` and
+`web/` shares the rest, with no limit per file and up to 32 files. A board's
+`boot_out.txt` says its number, and the IDE checks against it.
+
+The board measures its PSRAM when it starts and sizes these from it (the
+drive gets half, the store a quarter, within FAT12's and the partition's limits).
+What it can't measure is the PSRAM's type, octal or quad — that has to be
+right before it can talk to the chip at all, hence one build per board.
+
+| Board | Shared by `modules/` and `web/` | Drive |
+|---|---|---|
+| RP2040 / Pico W, ESP32-S3 without PSRAM | about 21KB | 48KB |
+| ESP32-S3 with 2MB PSRAM | about 500KB | 1MB |
+| ESP32-S3 with 8MB PSRAM | about 1MB | about 2MB |
+
+Moving a board between these sizes (e.g. flashing a PSRAM build) starts its
+store fresh.
 
 ### Compiler (TypeScript)
 
@@ -98,22 +148,31 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-- Real files: the IDE reads and writes `workspace/`, with tabs, dirty markers,
-  ⌘S save (and format-on-save), new/rename/delete; examples are copied in rather
-  than overwriting your buffer
-- Command palette (⌘K), activity bar, resizable panels, status bar
-- **Compiles as you type** — errors appear in the gutter on the line that caused
-  them, and the header shows how much of the 2048-byte budget you've used
-- **Run** (`⌘/Ctrl+Enter`) executes the program in the emulator and prints every
-  pin, bus and message it touches — no board required
-- **Flash** (`⌘/Ctrl+S`) and a live serial REPL over Web Serial, with Stop and
-  Reload buttons (Chrome or Edge; the emulator works in any browser)
-- Panels: **Run** (the hardware trace as a filterable table), **Display** (the
-  OLED framebuffer drawn pixel-for-pixel), **Pins** (the board's pin map with the
-  pins your program drove), **Problems**, and **Serial**
-- Hover any keyword for docs; completion knows the loaded modules
+- **First-run tour** of the IDE, with Skip (comes back next visit) and Don't
+  show again; retake it from the Guide or the command palette
+- **Several files at once**, Thonny-style: every program opens in its own tab,
+  tabs come back after a refresh, unsaved ones show a dot and ask before closing.
+  Middle-click closes a tab; ⌥W closes, ⌥[ / ⌥] switch
+- **My programs** and **Examples** are separate views. Examples open read-only
+  (book icon on the tab); "Make my own copy" or the copy button puts an editable
+  one in My programs
+- **Module manager**, like Arduino's Library Manager: search the library,
+  Install / Update / Remove. Installing adds `use <module>` to the open program.
+  The library is the repo's `modules/`; installed modules live in
+  `workspace/modules/`, and only those compile into your programs (examples see
+  the whole library). Writing `use bmp280` before installing it offers a
+  one-click Install in the error strip
+- **Compiles as you type** — errors in red on the line that caused them; board
+  notes in yellow for things that compile but behave differently on the
+  selected board (ADC2 with Wi-Fi on the S3, Pico W HTTP limits, USB pins…)
+- **Run** (`⌘/Ctrl+Enter`) runs in the simulator with no board connected, or on
+  the board when one is. The simulator pane stays hidden until you run in it or
+  open it from the ribbon
+- Command palette (⌘K), ⌘S save with format-on-save, a live serial REPL over
+  Web Serial (Chrome or Edge; the simulator works in any browser)
+- Leaving the page with unsaved changes asks first
+- Hover any keyword for docs; completion knows the installed modules
   (`bmp280.` → its fields) and the selected board's pins (`set pin ` → `25 — LED`)
-- Run configuration: preset input pins (`15=1`) and simulate a radio-less board
 
 ## Language
 
@@ -304,13 +363,12 @@ rather than emitting something that won't run.
 
 ## Radios (Wi-Fi + Bluetooth LE)
 
-Wi-Fi and BLE are implemented for the **Pico W / Pico 2 W** (Infineon CYW43439).
-Build the radio firmware with a board flag:
+Wi-Fi and BLE are implemented for the **Pico W** (Infineon CYW43439) and every
+**ESP32-S3** board. The S3 firmware always has them; the Pico W needs its own build:
 
 ```bash
-mkdir build-picow && cd build-picow
-cmake .. -DZAPP_BOARD=pico_w -DPICO_SDK_PATH=../pico-sdk
-make -j8            # 519KB flash, 162KB RAM (vs 132KB/111KB without a radio)
+cd firmware/rp2040
+cmake -B build-picow -DZAPP_BOARD=pico_w && make -C build-picow -j8
 ```
 
 ```zap
@@ -336,8 +394,8 @@ print "open http://" + wifi ip      # 192.168.4.1
 `start wifi` makes the board its own network and hands out addresses to
 phones and laptops that join. `serve web` serves the drive's `web/` folder on
 port 80: `/` is `web/index.html`, `/style.css` is `web/style.css`. It works on
-either network, joined or started. Limits: 2KB per file, file names up to 19
-characters, 8 files across `modules/` and `web/`, 8 clients on the access point.
+either network, joined or started. Pages can be any size the board's storage
+holds (see above), with names up to 27 characters; the access point takes 8 clients.
  On a board with no radio the VM
 stops with `Hardware Error: this board has no radio` instead of doing nothing
 quietly, and the emulator reproduces both cases (`--no-radio` fakes a plain
@@ -361,12 +419,14 @@ repeat forever:
     sleep 2s
 ```
 
-Implementation: `include/hal_radio.h` is the interface, `src/hal_radio_cyw43.c`
-(Wi-Fi, lwIP in threadsafe-background mode because the VM runs on core 1) and
-`src/hal_ble_cyw43.c` (BLE, btstack on the CYW43 async context) are the Pico W
-backends, `src/hal_radio_none.c` is every other board. The GATT database is
-`src/zapp_ble.gatt`, compiled to a header at build time. Opcodes live in the
-`0xF0` block.
+Implementation: `firmware/core/hal_radio.h` is the interface.
+`firmware/rp2040/hal_radio_cyw43.c` (Wi-Fi, lwIP in threadsafe-background mode
+because the VM runs on core 1) and `hal_ble_cyw43.c` (BLE, btstack on the CYW43
+async context) are the Pico W backends, with the GATT database in
+`zapp_ble.gatt`. `firmware/esp32s3/main/hal_radio_esp32.c` is the ESP32-S3
+backend (esp_wifi, esp_http_client, esp_http_server, NimBLE).
+`firmware/core/hal_radio_none.c` is every board without a radio. Opcodes live
+in the `0xF0` block.
 
 ### What each chip can actually do
 
@@ -374,7 +434,8 @@ backends, `src/hal_radio_none.c` is every other board. The GATT database is
 |--------|-------|-------------|
 | RP2040 (Pico, XIAO, Feather) | none | `hal_radio_none.c` — fails loudly |
 | **Pico W / Pico 2 W** | 2.4GHz Wi-Fi 4 (802.11n) + BLE 5.2, CYW43439 | **Wi-Fi and BLE both built** |
-| ESP32-C3/S3 | 2.4GHz Wi-Fi 4 + BLE 5 | needs a `hal_esp32.c` port onto ESP-IDF |
+| **ESP32-S3** | 2.4GHz Wi-Fi 4 + BLE 5 | **Wi-Fi, BLE, HTTPS and POST all built** (`firmware/esp32s3`) |
+| ESP32-C3 | 2.4GHz Wi-Fi 4 + BLE 5 | same port minus native USB (it has none), so no drive or HID |
 | ESP32-C5 | 2.4 **and 5GHz** Wi-Fi 6 + BLE 5 + 802.15.4 | same port; in mass production since April 2025, ESP-IDF ≥ 5.4 |
 | nRF52/53 | BLE 5.3, Thread, Matter | port onto the nRF Connect SDK |
 | nRF7002 companion | Wi-Fi 6, dual-band 2.4/5GHz | host MCU + nRF70 driver over SPI |
@@ -383,6 +444,10 @@ Two things worth being precise about: **no 5GHz on any Pico** — the CYW43439 i
 2.4GHz only, so dual-band means moving to ESP32-C5 or an nRF7002 companion. And
 **nothing here reaches Wi-Fi 6E/7**: the nRF7002 is Wi-Fi 6 dual-band and does
 not do 6GHz, and 6E parts are outside what this firmware targets.
+
+The S3 backend has none of the Pico W's HTTP limits below: `http post` works,
+`https://` works (ESP-IDF's certificate bundle), and the access point uses
+ESP-IDF's own DHCP server. Responses are still 63 bytes, as that's a Zapp string.
 
 ### Known limits of the Pico W backend
 
@@ -400,117 +465,75 @@ not do 6GHz, and 6E parts are outside what this firmware targets.
 
 ## Module system (`.zappmod`)
 
-Modules are declarative sensor definitions. No code — the compiler generates all I2C/UART sequences from the file.
+A module file describes one part so programs can say `use tmp102` /
+`get data from tmp102` / `print tmp102.temp`. The compiler turns the file into
+ordinary bytecode; anything the file can't express is a named routine in the
+firmware (`firmware/core/vm.c`) that the file refers to by name.
 
-### Format
+### What a module file can describe on its own
+
+I2C parts read by register: an address, start-up register writes, and per
+reading the register, how its bytes form a number, and the datasheet's maths.
 
 ```toml
 [module]
-name        = "sensor_name"
+name        = "tmp102"
 version     = "1.0.0"
-description = "What it is"
+description = "TMP102 temperature sensor"
 author      = "you"
 
 [compat]
-min_flash_kb = 4
-min_ram_kb   = 2
-targets      = ["all"]
-interface    = "i2c"            # i2c | uart | spi
+interface   = "i2c"
 
-[i2c]                           # for I2C modules
-addr_default = 0x76
-addr_alt     = 0x77
+[i2c]
+addr_default = 0x48
 
-[init]                          # registers written before first read
-0xF4 = 0xB7
-0xF5 = 0xB0
+# [init] holds register = value writes (one byte each) sent on first use, for
+# chips that must be woken — the MPU6050 needs 0x6B = 0x00. The TMP102 needs none.
 
-[fields.temp]                   # each field becomes module.field in Zapp
-type      = "num"
-reg       = 0xFA
-len       = 3
-transform = "bmp280_temp"
+[fields.temp]          # programs read tmp102.temp
+type   = "num"         # or "bool"
+reg    = 0x00
+format = "i16_be"      # u8 i8 u16_be u16_le i16_be i16_le u24_be ... i32_le
+shift  = 4             # optional, applied in this order:
+bits   = 12            #   drop low bits, keep N bits (signed formats keep the sign),
+mask   = 0x0FFF        #   keep these bits, multiply, add
+scale  = 0.0625
+offset = 0
 ```
 
-### How it works
+`len` follows from `format`. Comments go on their own lines — everything after
+`=` is the value. The IDE's **Module manager → New module** writes this
+template with every line explained, and the editor points at mistakes.
 
-The `.zappmod` file tells the compiler everything it needs:
+### What needs firmware support
 
-1. **`[i2c]`** — device address on the bus
-2. **`[init]`** — config registers to write before reading (emitted as `OP_I2C_WRITE` bytecode)
-3. **`[fields.*]`** — which register to read, how many bytes, and which transform to apply
+These module files work because the firmware has the routine they name; a new
+one means adding C to `vm.c` and rebuilding:
 
-When you write `get data from bmp280`, the compiler emits:
-```
-OP_I2C_WRITE  0x76 0xF4 0x01 0xB7    # init register (first call only)
-OP_I2C_WRITE  0x76 0xF5 0x01 0xB0    # init register (first call only)
-OP_I2C_READ   0x76 0xFA 0x03         # read 3 bytes from temp register
-OP_TRANSFORM  0x09                    # bmp280_temp transform
-OP_STORE      0x00                    # save to slot 0
-OP_I2C_READ   0x76 0xF7 0x03         # read 3 bytes from pressure register
-OP_TRANSFORM  0x0A                    # bmp280_pressure transform
-OP_STORE      0x01                    # save to slot 1
-```
+| Kind | In the file | Routines that exist |
+|---|---|---|
+| Chip-specific maths | `transform = "..."` | `bmp280_temp` (°C) and `bmp280_pressure` (hPa), using the chip's calibration; `ds3231_time`, `ds3231_date`; `mpu6050_accel` (g, ±2g range), `mpu6050_gyro` (°/s, ±250°/s) |
+| Older plain transforms | `transform = "..."` | `raw_u8`, `raw_u16_be/le`, `raw_i16_be/le`, `scaled_100`, `scaled_1000` (signed ÷100/÷1000), `bcd_byte` — `format` covers all of these |
+| GPS (UART lines) | `parse = "..."` | `nmea_gga_lat`, `nmea_gga_lon`, `nmea_gga_alt`, `nmea_gga_fix`, `nmea_rmc_speed` |
+| Screens | `[display] controller` | SSD1306 and SH1106 with a built-in 5×7 font, detected at start-up |
+| SPI fields | `rx_len`, `bit_mask`, `bit_shift`, `scale`, `transform = "twos_complement_N"` | as used by `max31855` |
 
-### UART modules
-
-UART modules (GPS, Bluetooth) use a stream protocol:
-
-```toml
-[compat]
-interface    = "uart"
-
-[uart]
-baud         = 9600
-bits         = 8
-parity       = "none"
-stop_bits    = 1
-
-[fields.latitude]
-type         = "num"
-read         = "line"
-filter       = "$GPGGA"
-parse        = "nmea_gga_lat"
-```
+Not supported yet: a second address (`addr_alt` is ignored), multi-byte or
+timed start-up sequences, and `min_flash_kb` / `targets` (informational only).
 
 ### Included modules
 
-| Module | Interface | Description |
-|--------|-----------|-------------|
-| `bmp280` | I2C | Temperature + pressure sensor |
-| `ds3231` | I2C | Real-time clock |
-| `mpu6050` | I2C | 6-axis accelerometer/gyroscope |
-| `gps_nmea` | UART | Generic NMEA GPS receiver |
-| `hc05` | UART | HC-05 Bluetooth module |
-| `max31855` | SPI | Thermocouple amplifier |
-| `ssd1306` | Display | 128×64 0.96" I2C OLED |
-
-### Writing a new module
-
-1. Create `modules/yourdevice.zappmod`
-2. Fill in `[module]`, `[compat]`, interface config, and `[fields]`
-3. If the device needs a new transform, add it to the VM (`vm.c` transform switch) and emitter (`TRANSFORM_IDS`)
-4. Use it: `use yourdevice` / `get data from yourdevice`
-
-### Available transforms
-
-| Transform | ID | Description |
-|-----------|-----|-------------|
-| `raw_u8` | 0x00 | First byte as unsigned number |
-| `raw_u16_be` | 0x01 | 2 bytes big-endian unsigned |
-| `raw_u16_le` | 0x02 | 2 bytes little-endian unsigned |
-| `raw_i16_be` | 0x03 | 2 bytes big-endian signed |
-| `raw_i16_le` | 0x04 | 2 bytes little-endian signed |
-| `scaled_100` | 0x05 | Signed 16-bit / 100 |
-| `scaled_1000` | 0x06 | Signed 16-bit / 1000 |
-| `twos_complement_16` | 0x07 | 2 bytes big-endian signed |
-| `bcd_byte` | 0x08 | One BCD byte as a number |
-| `bmp280_temp` | 0x09 | BMP280 temperature compensation |
-| `bmp280_pressure` | 0x0A | BMP280 pressure compensation |
-| `ds3231_time` | 0x0B | BCD time → "HH:MM:SS" |
-| `ds3231_date` | 0x0C | BCD date → "DD/MM/YYYY" |
-| `mpu6050_accel` | 0x0D | Raw / 16384 → g-force |
-| `mpu6050_gyro` | 0x0E | Raw / 131 → degrees/sec |
+| Module | Interface | Reads |
+|--------|-----------|-------|
+| `bmp280` | I2C | `temp` (°C), `pressure` (hPa) |
+| `ds3231` | I2C | `time`, `date` |
+| `mpu6050` | I2C | `accel_x/y/z` (g), `gyro_x/y/z` (°/s) |
+| `max31855` | SPI | thermocouple temperature |
+| `gps_nmea` | UART | `latitude`, `longitude`, `altitude`, `fix`, `speed` |
+| `hc05` | UART | Bluetooth serial |
+| `oled` | Display | any SSD1306 / SH1106 I2C OLED, detected |
+| `ssd1306`, `ssd1306_32`, `sh1106` | Display | one specific screen |
 
 ## REPL
 
@@ -605,6 +628,14 @@ active-low); raw GPIO numbers are never inverted.
 | `kb2040` | Adafruit KB2040 | `NEOPIXEL`, `BUTTON` |
 | `tiny2040` | Pimoroni Tiny 2040 | `LED_RED/GREEN/BLUE`, `BUTTON` |
 | `rp2040_zero` | Waveshare RP2040-Zero | `NEOPIXEL` |
+| `esp32s3_devkitc` | Espressif ESP32-S3-DevKitC-1 | `NEOPIXEL`, `BUTTON` |
+| `feather_esp32s3` | Adafruit Feather ESP32-S3 | `LED`, `NEOPIXEL`, `BUTTON` |
+| `qtpy_esp32s3` | Adafruit QT Py ESP32-S3 | `NEOPIXEL`, `BUTTON` |
+| `xiao_esp32s3` | Seeed XIAO ESP32S3 | `LED` |
+| `esp32s3_zero` | Waveshare ESP32-S3-Zero | `NEOPIXEL`, `BUTTON` |
+| `lolin_s3_mini` | LOLIN S3 Mini | `NEOPIXEL`, `BUTTON` |
+
+Every ESP32-S3 profile runs the same `firmware/esp32s3` build.
 
 A profile is a small text file in `boards/`:
 
@@ -626,27 +657,25 @@ BUTTON   = "button active_low"
 
 ```
 zapp/
-  include/           C headers (vm.h, hal.h, config.h, ...)
-  src/               C sources
-    main.c           Core 0: USB, REPL, LLM mode, auto-sync
-    vm.c             Core 1: bytecode VM
-    hal_rp2040.c     HAL implementation (GPIO, PWM, servo, ADC, I2C, SPI, UART, PIO)
-    usb_device.c     USB device library: descriptors, CDC helpers
-    usb_hid.c        HID library: keyboard + mouse reports
-    usb_msc.c        FAT12 mass storage driver
-    uart_ring.c      Byte ring buffer (cross-core debug, UART RX)
-    project_store.c  Flash-backed script storage
-  compiler/          TypeScript compiler
-    src/
-      lexer.ts       Tokenizer
-      emitter.ts     Parser + bytecode emitter
-      opcodes.ts     Opcode/transform/parser id tables (mirrors vm.h)
-      modfile.ts     .zappmod file parser
-      index.ts       Public API + built-in modules
+  firmware/
+    core/            Shared by every chip
+      repl.c         Main loop: USB, REPL, LLM mode, auto-sync, VM hand-off
+      vm.c           Bytecode VM (runs on the second core)
+      hal.h          Hardware interface each port implements
+      hal_radio.h    Wi-Fi / HTTP / web / BLE interface
+      port.h         Per-chip glue: cores, reboot, flash sectors
+      hal_common.c   HID queue, debug output, web file lookup
+      usb_device.c   USB descriptors, CDC helpers
+      usb_hid.c      Keyboard + mouse reports
+      usb_msc.c      FAT12 drive (main.zap, modules/, web/)
+      project_store.c  Flash-backed project storage
+    rp2040/          Pico SDK port: CMakeLists.txt, HAL, CYW43 Wi-Fi/BLE, pico-sdk/
+    esp32s3/         ESP-IDF port: main/ (HAL, Wi-Fi/BLE), partitions, sdkconfig
+  compiler/          TypeScript compiler (lexer, emitter, opcodes, .zappmod parser)
+  emulator/          Host build of the VM + a virtual board
+  boards/            Board pin profiles (.zappboard)
   modules/           Sensor module definitions (.zappmod)
   examples/          Example .zap programs
-  pio/               PIO program (ws2812)
-  emulator/          Host build of the VM + a virtual board
   tests/             Jest suites (compiler, opcodes, end-to-end VM)
   ide/               Next.js web IDE
   mcp/               MCP server — lets Claude drive a board or the emulator
@@ -678,9 +707,10 @@ The VM supports these bytecode instructions:
 | 0xE0-0xE2 | HID | key, type, mouse |
 | 0xF0-0xF4 | Wi-Fi | connect, status, ip, http get, http post |
 | 0xF5-0xF8 | BLE | advertise, notify, status, message |
+| 0xF9-0xFA | Wi-Fi | start access point, serve web |
 | 0xFF | Control | halt |
 
-Every opcode in the table is implemented in `src/vm.c`; `tests/opcodes.test.ts`
+Every opcode in the table is implemented in `firmware/core/vm.c`; `tests/opcodes.test.ts`
 fails the build if one is added to `vm.h` without an implementation, or if the
 compiler's table drifts from the firmware's.
 
